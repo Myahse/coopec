@@ -1,0 +1,53 @@
+stages:
+  - deploy
+
+variables:
+  # Interface web : port hôte (surchargeable dans GitLab CI/CD → Variables)
+  # 9091 = API backend sur le même serveur → ne pas l'utiliser pour le front
+  APP_HOST_PORT: "8010"
+  APP_CONTAINER_PORT: "8010"
+  DOCKER_IMAGE: $CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
+
+.deploy_script: &deploy_script
+  - export VITE_API_BASE="${VITE_API_BASE:-https://coopeccollect.djogana-pay.com:9091}"
+  - docker build
+      --build-arg VITE_API_BASE="${VITE_API_BASE}"
+      --build-arg VITE_LOGIN_PATH="${VITE_LOGIN_PATH:-/api/auth/login-web}"
+      -t $DOCKER_IMAGE .
+  - docker rm -f $CI_PROJECT_NAME || true
+  - |
+    for cid in $(docker ps -q --filter "publish=${APP_HOST_PORT}"); do
+      echo "Libération du port ${APP_HOST_PORT} — arrêt conteneur $cid"
+      docker rm -f "$cid" || true
+    done
+  - docker run --restart always -d
+      -p ${APP_HOST_PORT}:${APP_CONTAINER_PORT}
+      --name $CI_PROJECT_NAME
+      $DOCKER_IMAGE
+  - sleep 5
+  - docker ps --filter name=$CI_PROJECT_NAME
+  - docker logs --tail 50 $CI_PROJECT_NAME
+
+# ---------- DÉVELOPPEMENT (branche develop) ----------
+deploy-dev:
+  stage: deploy
+  image: docker:27
+  tags:
+    - build
+  variables:
+    VITE_API_BASE: $VITE_API_BASE_DEV
+  script: *deploy_script
+  only:
+    - develop
+
+# ---------- PRODUCTION (branche production) ----------
+deploy-production:
+  stage: deploy
+  image: docker:27
+  tags:
+    - production
+  variables:
+    VITE_API_BASE: $VITE_API_BASE_PROD
+  script: *deploy_script
+  only:
+    - production

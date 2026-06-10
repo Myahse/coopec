@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.gitlab
+.env
+.env.*
+.env.example
+*.log
+.vercel
+tmp-openapi.json
+docs
+scripts
+.cursor
+terminals
