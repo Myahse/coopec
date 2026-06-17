@@ -16,26 +16,26 @@ Interface web de gestion **Coopec Collect** — tableau de bord, administration,
 
 | Contexte | Port / URL | Description |
 |----------|------------|-------------|
-| **Interface web (Docker)** | Hôte **8010** → conteneur **8010** | Front React/Nginx — déploiement GitLab CI |
+| **Interface web (Docker)** | Hôte **9080** → conteneur **8010** | Front React/Nginx — déploiement GitLab CI |
 | **API Coopec (backend)** | https://coopeccollect.djogana-pay.com:**9091** | API Java — **ne pas réutiliser le port 9091 pour le front** |
 | **Dev local (Vite)** | http://localhost:5173 | `npm run dev` — proxy `/api` via `VITE_API_PROXY_TARGET` |
 | **Preview build local** | http://localhost:4173 | `npm run preview` après `npm run build` |
 
-> Sur le serveur `peya-pay-test-2`, le port **9091** est déjà occupé par l’API backend. L’interface web est exposée sur le port **8010**.
+> Sur le serveur `peya-pay-test-2`, le port **9091** est occupé par l’API backend. L’interface web est exposée sur le port hôte **9080** (Nginx écoute **8010** dans le conteneur).
 
 ### Déploiement par branche
 
 | Branche | Job GitLab | Runner tag | Port interface | Déclenchement |
 |---------|------------|------------|----------------|---------------|
-| `develop` | `deploy-dev` | `build` | **8010** | Push sur `develop` |
-| `production` | `deploy-production` | `production` | **8010** | Push sur `production` |
+| `develop` | `deploy-dev` | `build` | **9080** (→ 8010) | Push sur `develop` |
+| `production` | `deploy-production` | `production` | **9080** (→ 8010) | Push sur `production` |
 
 Après déploiement, l’interface est accessible sur :
 
-- **Développement** : `http://<serveur-runner-build>:8010`
-- **Production** : `http://<serveur-runner-production>:8010`
+- **Développement** : `http://<serveur-runner-build>:9080`
+- **Production** : `http://<serveur-runner-production>:9080`
 
-Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (ex. `9080` si 8010 est pris).
+Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (défaut : **9080**).
 
 ### Variables CI/CD recommandées (GitLab → Settings → CI/CD → Variables)
 
@@ -43,7 +43,7 @@ Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (ex. `9080` s
 |----------|---------------|---------|------|
 | `VITE_API_BASE_DEV` | develop | `https://coopeccollect.djogana-pay.com:9091` | URL API au build Docker (dev) |
 | `VITE_API_BASE_PROD` | production | `https://coopeccollect.djogana-pay.com:9091` | URL API au build Docker (prod) |
-| `APP_HOST_PORT` | les deux | `8010` | Port hôte de l’interface (défaut : 8010) |
+| `APP_HOST_PORT` | les deux | `9080` | Port hôte de l’interface (conteneur : 8010) |
 | `VITE_LOGIN_PATH` | les deux | `/api/auth/login-web` | Endpoint de connexion (optionnel) |
 
 ## Prérequis
@@ -149,19 +149,19 @@ Le fichier `.gitlab-ci.yml` construit l’image et lance le conteneur :
 
 ```bash
 docker build -t coopec_web_v2:<commit> .
-docker run --restart always -d -p 8010:8010 --name coopec_web_v2 coopec_web_v2:<commit>
+docker run --restart always -d -p 9080:8010 --name coopec_web_v2 coopec_web_v2:<commit>
 ```
 
 - **Dockerfile** : build Vite + Nginx (écoute **8010** dans le conteneur)
-- **Mapping** : `-p 8010:8010` (port hôte **8010** — API séparée sur **9091**)
+- **Mapping** : `-p 9080:8010` (hôte **9080** → conteneur **8010**, API sur **9091**)
 - **Nom du conteneur** : `$CI_PROJECT_NAME` (= `coopec_web_v2`)
 
 Build manuel local :
 
 ```bash
 docker build --build-arg VITE_API_BASE="https://coopeccollect.djogana-pay.com:9091" -t coopec-interface .
-docker run --rm -p 8010:8010 coopec-interface
-# → http://localhost:8010
+docker run --rm -p 9080:8010 coopec-interface
+# → http://localhost:9080
 ```
 
 ## Branches
