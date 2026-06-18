@@ -78,16 +78,214 @@ npm run preview
 
 ## Configuration
 
-Variables principales pour `.env` :
+Variables principales pour `.env` (fichier local, non versionné) :
 
 | Variable | Description |
 |----------|-------------|
 | `VITE_API_BASE` | URL de base de l’API (vide = même origine / proxy) |
 | `VITE_LOGIN_PATH` | Endpoint de connexion (défaut : `/api/auth/login-web`) |
-| `VITE_API_PROXY_TARGET` | Cible du proxy Vite en local (voir `vite.config.ts`) |
+| `VITE_API_PROXY_TARGET` | Cible du proxy Vite en local (ex. `https://coopeccollect.djogana-pay.com:9091`) |
 | `VITE_DASHBOARD_STATS_PATH` | Statistiques du tableau de bord |
 
 D’autres chemins optionnels (`VITE_PRET_*`, `VITE_ETAT_*`, etc.) peuvent être ajoutés dans `.env` selon les écrans utilisés.
+
+### Comment l’API est branchée
+
+| Couche | Fichier | Rôle |
+|--------|---------|------|
+| **Build** | `Dockerfile`, `.gitlab-ci.yml` | Injecte `VITE_API_BASE` au `npm run build` |
+| **HTTP** | `src/services/http.ts` | `apiFetch()` — préfixe `VITE_API_BASE` + chemin `/api/...` |
+| **Auth** | `src/services/auth.ts` | Login / reset password via `VITE_API_BASE` + `VITE_LOGIN_PATH` |
+| **Services** | `src/services/*.ts` | Un module par domaine (user, client, prêt, état…) |
+| **Dev proxy** | `vite.config.ts` | Redirige `/api` → `VITE_API_PROXY_TARGET` si défini |
+| **Vercel** | `api/proxy.ts` | Proxy serverless (optionnel) |
+
+En **production Docker**, l’URL API est **figée dans le bundle** au moment du build CI.
+
+## Architecture — diagrammes de séquence
+
+### Connexion utilisateur
+
+```mermaid
+sequenceDiagram
+  actor User as Utilisateur
+  participant UI as LoginPage
+  participant Auth as auth.ts
+  participant HTTP as http.ts / fetch
+  participant API as API Coopec :9091
+
+  User->>UI: login + mot de passe
+  UI->>Auth: login({ username, password })
+  Auth->>HTTP: POST {VITE_API_BASE}{VITE_LOGIN_PATH}
+  HTTP->>API: POST /api/auth/login-web
+  API-->>HTTP: token + profil utilisateur
+  HTTP-->>Auth: AuthResponse
+  Auth-->>UI: userContext + token
+  UI->>UI: localStorage (auth-session)
+  UI->>User: redirection /dashboard
+```
+
+### Appel métier (ex. liste clients)
+
+```mermaid
+sequenceDiagram
+  participant Page as Page React
+  participant Svc as services/client.ts
+  participant HTTP as http.ts
+  participant Session as auth-session
+  participant API as API Coopec :9091
+
+  Page->>Svc: listClients(filters)
+  Svc->>HTTP: apiFetch("/api/client/...")
+  HTTP->>Session: getStoredToken()
+  Session-->>HTTP: Bearer token
+  HTTP->>API: GET/POST + Authorization
+  API-->>HTTP: JSON (enveloppe ApiResponse)
+  HTTP-->>Svc: Response
+  Svc-->>Page: données typées
+  Page->>Page: tableau + pagination + export
+```
+
+### Déploiement GitLab CI
+
+```mermaid
+sequenceDiagram
+  participant Dev as Développeur
+  participant GL as GitLab
+  participant Runner as Runner (tag build)
+  participant Docker as Docker
+  participant Nginx as Conteneur Nginx :8010
+  participant API as API backend :9091
+
+  Dev->>GL: push develop
+  GL->>Runner: job deploy-dev
+  Runner->>Docker: docker build --build-arg VITE_API_BASE=...
+  Docker->>Docker: npm run build (Vite)
+  Runner->>Docker: docker run -p 9080:8010
+  Note over Nginx: SPA statique
+  Note over API: Appels navigateur directs vers :9091
+  Dev->>Nginx: http://serveur:9080
+  Nginx-->>Dev: index.html + assets JS
+```
+
+## Structure du projet
+
+```
+coopec-interface/
+├── .gitlab-ci.yml          # Pipeline deploy-dev / deploy-production
+├── Dockerfile              # Build Vite + image Nginx
+├── docker/nginx/           # Config Nginx (port 8010, SPA fallback)
+├── vite.config.ts          # Alias @, proxy /api en dev
+├── api/proxy.ts            # Proxy Vercel (optionnel)
+├── docs/                   # État des lieux (Word)
+├── scripts/                # Utilitaires (génération doc)
+├── public/                 # Favicon, icônes statiques
+└── src/
+    ├── main.tsx            # Point d’entrée React
+    ├── App.tsx             # Routes React Router
+    ├── index.css           # Styles globaux (Tailwind)
+    │
+    ├── components/         # UI réutilisable
+    │   ├── ui/             # shadcn (button, sheet, select…)
+    │   ├── animate-ui/     # Composants animés (accordion, hover-card)
+    │   ├── DashboardSidebar.tsx
+    │   ├── DirectionAgenceFilterSheet.tsx   # Tiroir filtre Direction/Agence
+    │   ├── RequireAuth.tsx
+    │   ├── CourbeCollectChart*.tsx
+    │   └── Table*.tsx      # Pagination, export, tri colonnes
+    │
+    ├── contexts/
+    │   ├── DashboardFiltersContext.tsx      # Filtres institution/direction/agence
+    │   └── DashboardSectionNavContext.tsx   # Navigation sections drawer
+    │
+    ├── hooks/
+    │   ├── use-direction-agence-filters.ts
+    │   ├── use-table-pagination.ts
+    │   └── use-inactivity-logout.ts
+    │
+    ├── layouts/
+    │   ├── DashboardAppLayout.tsx           # Shell authentifié (sidebar)
+    │   ├── DashboardSectionsShell.tsx       # Sections avec sous-menu drawer
+    │   ├── DashboardTablePageLayout.tsx     # Layout pages tableaux
+    │   └── DashboardPageShell.tsx
+    │
+    ├── constants/
+    │   ├── dashboard-sections.ts            # Menu sidebar + routes sections
+    │   └── table-styles.ts
+    │
+    ├── pages/              # Écrans métier (1 dossier ≈ 1 domaine)
+    │   ├── LoginPage/
+    │   ├── DashboardPage/
+    │   ├── UsersPage/          # + components/, hooks, mappers
+    │   ├── CollecteursPage/
+    │   ├── ClientsPage/
+    │   ├── AbonnementsPage/
+    │   ├── AgencesPage/
+    │   ├── CoopecInstitutionsPage/
+    │   ├── ObjectifsPage/
+    │   ├── TypePretPage/
+    │   ├── OperationsPage/     # Arrêtés, reversements cartes…
+    │   ├── EtatsPage/          # États opérationnels / comptables
+    │   ├── PretsPage/          # Workflow, déblocage, impayés…
+    │   ├── ExtractionTxtPage/
+    │   ├── ExtractionCartePage/
+    │   ├── HistoriqueComptablePage/
+    │   ├── CourbeCollectPage/
+    │   ├── CartesClientelePage/
+    │   └── AidePage/
+    │
+    ├── services/           # Couche API (appels HTTP)
+    │   ├── http.ts             # apiFetch — cœur HTTP + token
+    │   ├── auth.ts             # Login, reset password
+    │   ├── session.ts          # Logout
+    │   ├── api-json.ts         # Helpers JSON / enveloppes
+    │   ├── openapi.ts          # Types générés / référence OpenAPI
+    │   ├── administration.ts   # Objectifs, types prêt, params…
+    │   ├── user.ts, client.ts, collecteur.ts, agence.ts
+    │   ├── operation.ts, abonnement.ts
+    │   ├── dashboard*.ts, courbe-collect.ts
+    │   ├── etat-*.ts, pret-*.ts, charge-epargne.ts…
+    │   └── extraction-*.ts, historique-comptable.ts
+    │
+    ├── utils/              # Mappers, labels, exports
+    │   ├── auth-session.ts       # Token localStorage
+    │   ├── api-envelope.ts       # Parse réponses API
+    │   ├── table-export.ts       # Excel / PDF
+    │   ├── objectif-mappers.ts, type-pret-mappers.ts
+    │   └── direction-label.ts, profile-label.ts…
+    │
+    ├── assets/             # Logos, bannières (images)
+    └── lib/utils.ts        # cn() Tailwind
+```
+
+### Flux des couches (front)
+
+```
+pages/  →  services/  →  http.ts  →  API Coopec
+   ↑           ↑
+hooks/     utils/ (mappers, session)
+contexts/
+layouts/
+```
+
+### Routes principales (`App.tsx`)
+
+| Chemin | Page |
+|--------|------|
+| `/`, `/login` | Connexion |
+| `/dashboard` | Tableau de bord |
+| `/dashboard/utilisateurs` | Gestion utilisateurs |
+| `/dashboard/collecteurs`, `/clients`, `/abonnements` | Référentiels |
+| `/dashboard/operations/*` | Arrêtés, reversements |
+| `/dashboard/etats/*` | États opérationnels |
+| `/dashboard/prets/*` | Prêts |
+| `/dashboard/objectifs`, `/configuration-type-pret` | Administration |
+| `/dashboard/courbe-collect` | Courbe de collecte |
+| `/dashboard/aide/*` | Aide intégrée |
+| `/dashboard/agences`, `/coopec` | Agences, institutions |
+| `/dashboard/extraction-txt`, `/extraction-txt-superviseur` | Extractions TXT |
+| `/dashboard/extraction-carte`, `/historique` | Extraction carte, historique comptable |
+| `/dashboard/cartes-clientele` | Cartes clientèle |
 
 ## Fonctionnalités principales
 
@@ -127,21 +325,6 @@ D’autres chemins optionnels (`VITE_PRET_*`, `VITE_ETAT_*`, etc.) peuvent être
 
 - **Filtre Direction / Agence** : tiroir latéral « Filtre » (`DirectionAgenceFilterSheet`) sur les écrans concernés
 - **Exports tableaux** : Excel et PDF via `src/utils/table-export.ts`
-
-## Structure du projet
-
-```
-src/
-  components/     # Composants UI réutilisables
-  contexts/       # Filtres dashboard, navigation sections
-  hooks/          # Pagination, filtres direction/agence
-  layouts/        # Shell dashboard, pages tableaux
-  pages/          # Écrans par domaine métier
-  services/       # Appels API (auth, user, administration, prêts…)
-  utils/          # Mappers, session, exports
-docs/             # Documentation d’état des lieux (Word)
-scripts/          # Scripts utilitaires (génération doc)
-```
 
 ## Déploiement Docker (GitLab CI)
 
