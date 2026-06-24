@@ -2,13 +2,14 @@ stages:
   - deploy
 
 variables:
-  # Hôte 9080 → conteneur 8010 (Nginx). API backend = 9091 sur le même serveur.
+
   APP_HOST_PORT: "9080"
   APP_CONTAINER_PORT: "8010"
   DOCKER_IMAGE: $CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
 
 .deploy_script: &deploy_script
-  - export API_UPSTREAM="${API_UPSTREAM:-https://coopec.djogana-pay.com:9091}"
+ 
+  - export API_UPSTREAM="${API_UPSTREAM:-http://host.docker.internal:9091}"
   - export API_UPSTREAM_HOST="${API_UPSTREAM_HOST:-coopec.djogana-pay.com}"
   - docker build
       --build-arg VITE_API_BASE=""
@@ -22,6 +23,7 @@ variables:
     done
   - docker run --restart always -d
       -p ${APP_HOST_PORT}:${APP_CONTAINER_PORT}
+      --add-host=host.docker.internal:host-gateway
       -e API_UPSTREAM="${API_UPSTREAM}"
       -e API_UPSTREAM_HOST="${API_UPSTREAM_HOST}"
       --name $CI_PROJECT_NAME
@@ -29,6 +31,9 @@ variables:
   - sleep 5
   - docker ps --filter name=$CI_PROJECT_NAME
   - docker logs --tail 50 $CI_PROJECT_NAME
+  - |
+    echo "Test connectivité API depuis le conteneur..."
+    docker exec $CI_PROJECT_NAME wget -q -S -O /dev/null --timeout=10 "${API_UPSTREAM}/api/auth/login-web" 2>&1 | head -5 || true
 
 # ---------- DÉVELOPPEMENT (branche develop) ----------
 deploy-dev:

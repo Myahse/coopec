@@ -41,8 +41,8 @@ Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (défaut : **
 
 | Variable | Environnement | Exemple | Rôle |
 |----------|---------------|---------|------|
-| `API_UPSTREAM` | les deux | `https://coopec.djogana-pay.com:9091` | Cible du proxy Nginx `/api` (runtime) |
-| `API_UPSTREAM_HOST` | les deux | `coopec.djogana-pay.com` | En-tête `Host` vers l’API |
+| `API_UPSTREAM` | les deux | `http://host.docker.internal:9091` | Proxy Nginx → API sur l’**hôte** Docker |
+| `API_UPSTREAM_HOST` | les deux | `coopec.djogana-pay.com` | En-tête `Host` attendu par l’API Java |
 | `APP_HOST_PORT` | les deux | `9080` | Port hôte de l’interface (conteneur : 8010) |
 | `VITE_LOGIN_PATH` | build | `/api/auth/login-web` | Endpoint de connexion (optionnel) |
 
@@ -101,7 +101,9 @@ D’autres chemins optionnels (`VITE_PRET_*`, `VITE_ETAT_*`, etc.) peuvent être
 | **Dev proxy** | `vite.config.ts` | Redirige `/api` → `VITE_API_PROXY_TARGET` si défini |
 | **Vercel** | `api/proxy.ts` | Proxy serverless (optionnel) |
 
-En **Docker**, le navigateur appelle `https://<front>:9080/api/...` ; Nginx relaie vers `https://coopec.djogana-pay.com:9091` (configurable via `API_UPSTREAM`).
+En **Docker**, le navigateur appelle `https://<front>:9080/api/...` ; Nginx relaie vers l’API sur l’hôte (`host.docker.internal:9091` par défaut).
+
+> **504 Gateway Timeout** : le conteneur n’atteint pas l’API. Par défaut on utilise `http://host.docker.internal:9091` (API sur le même serveur que Docker). Si l’API est sur une autre machine, définir `API_UPSTREAM` dans GitLab (ex. `https://coopec.djogana-pay.com:9091`) et ouvrir le firewall sortant port 9091.
 
 ## Architecture — diagrammes de séquence
 
@@ -338,14 +340,15 @@ Le fichier `.gitlab-ci.yml` construit l’image et lance le conteneur :
 ```bash
 docker build -t coopec_web_v2:<commit> .
 docker run --restart always -d -p 9080:8010 \
-  -e API_UPSTREAM="https://coopec.djogana-pay.com:9091" \
+  --add-host=host.docker.internal:host-gateway \
+  -e API_UPSTREAM="http://host.docker.internal:9091" \
   -e API_UPSTREAM_HOST="coopec.djogana-pay.com" \
   --name coopec_web_v2 coopec_web_v2:<commit>
 ```
 
 - **Dockerfile** : build Vite + Nginx (écoute **8010** dans le conteneur)
 - **Mapping** : `-p 9080:8010` (hôte **9080** → conteneur **8010**)
-- **API** : proxy Nginx `/api` → `API_UPSTREAM` (défaut `https://coopec.djogana-pay.com:9091`)
+- **API** : proxy Nginx `/api` → `API_UPSTREAM` (défaut `http://host.docker.internal:9091`)
 - **Nom du conteneur** : `$CI_PROJECT_NAME` (= `coopec_web_v2`)
 
 Build manuel local :
@@ -353,7 +356,8 @@ Build manuel local :
 ```bash
 docker build -t coopec-interface .
 docker run --rm -p 9080:8010 \
-  -e API_UPSTREAM="https://coopec.djogana-pay.com:9091" \
+  --add-host=host.docker.internal:host-gateway \
+  -e API_UPSTREAM="http://host.docker.internal:9091" \
   coopec-interface
 # → http://localhost:9080  (API via /api/...)
 ```
