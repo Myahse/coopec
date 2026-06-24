@@ -8,9 +8,10 @@ variables:
   DOCKER_IMAGE: $CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
 
 .deploy_script: &deploy_script
-  - export VITE_API_BASE="${VITE_API_BASE:-https://coopec.djogana-pay.com:9091}"
+  - export API_UPSTREAM="${API_UPSTREAM:-https://coopec.djogana-pay.com:9091}"
+  - export API_UPSTREAM_HOST="${API_UPSTREAM_HOST:-coopec.djogana-pay.com}"
   - docker build
-      --build-arg VITE_API_BASE="${VITE_API_BASE}"
+      --build-arg VITE_API_BASE=""
       --build-arg VITE_LOGIN_PATH="${VITE_LOGIN_PATH:-/api/auth/login-web}"
       -t $DOCKER_IMAGE .
   - docker rm -f $CI_PROJECT_NAME || true
@@ -21,6 +22,8 @@ variables:
     done
   - docker run --restart always -d
       -p ${APP_HOST_PORT}:${APP_CONTAINER_PORT}
+      -e API_UPSTREAM="${API_UPSTREAM}"
+      -e API_UPSTREAM_HOST="${API_UPSTREAM_HOST}"
       --name $CI_PROJECT_NAME
       $DOCKER_IMAGE
   - sleep 5
@@ -33,8 +36,6 @@ deploy-dev:
   image: docker:27
   tags:
     - build
-  variables:
-    VITE_API_BASE: $VITE_API_BASE_DEV
   script: *deploy_script
   only:
     - develop
@@ -45,8 +46,6 @@ deploy-production:
   image: docker:27
   tags:
     - production
-  variables:
-    VITE_API_BASE: $VITE_API_BASE_PROD
   script: *deploy_script
   only:
     - production

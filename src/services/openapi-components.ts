@@ -239,7 +239,7 @@ export type ArreteCollecteDto = {
   login?: string
   codeClientCollecteur?: string
   nomCollecteur?: string
-  /** Compte à créditer (OpenAPI : `compteToCredit`). */
+  /** Compte à créditer  */
   compteToCredit?: string
   compteCollecteur?: string
   loginCollecteur?: string
@@ -312,7 +312,7 @@ export type ValiderArreteCollecteurDto = {
   codeAgence?: string
   login?: string
   referenceOperation?: string
-  /** Champs historiques (certains backends). */
+  /** Champs historiques  */
   date?: string
   loginCollecteur?: string
   montantConstate?: number

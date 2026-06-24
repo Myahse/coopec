@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => {
           configure: (proxy) => {
             ;(proxy as any).on('proxyReq', (proxyReq: any) => {
               proxyReq.setHeader('origin', 'https://www.djoganapayci.com')
-              proxyReq.setHeader('referer', 'https://www.djoganapayci.com/COOPEC_DEMO')
+              proxyReq.setHeader('referer', 'http://localhost:5173/COOPEC_DEMO')
               proxyReq.setHeader('host', 'www.djoganapayci.com')
               proxyReq.setHeader('accept', 'application/json')
               proxyReq.setHeader('content-type', 'application/json')
@@ -42,11 +42,10 @@ export default defineConfig(({ mode }) => {
               '/api': {
                 target: apiProxyTarget,
                 changeOrigin: true,
-                // Allow self-signed / misconfigured certs in dev proxy
+                
                 secure: false,
                 cookieDomainRewrite: 'localhost',
-                // Session cookies from login are often scoped to a narrow Path (e.g. /api/auth) or marked
-                // Secure+SameSite=None; that breaks follow-up calls from http://localhost. Normalize for dev.
+               
                 configure: (proxy) => {
                   proxy.on('proxyRes', (proxyRes: http.IncomingMessage) => {
                     const raw = proxyRes.headers['set-cookie']

@@ -41,10 +41,10 @@ Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (défaut : **
 
 | Variable | Environnement | Exemple | Rôle |
 |----------|---------------|---------|------|
-| `VITE_API_BASE_DEV` | develop | `https://coopeccollect.djogana-pay.com:9091` | URL API au build Docker (dev) |
-| `VITE_API_BASE_PROD` | production | `https://coopeccollect.djogana-pay.com:9091` | URL API au build Docker (prod) |
+| `API_UPSTREAM` | les deux | `https://coopec.djogana-pay.com:9091` | Cible du proxy Nginx `/api` (runtime) |
+| `API_UPSTREAM_HOST` | les deux | `coopec.djogana-pay.com` | En-tête `Host` vers l’API |
 | `APP_HOST_PORT` | les deux | `9080` | Port hôte de l’interface (conteneur : 8010) |
-| `VITE_LOGIN_PATH` | les deux | `/api/auth/login-web` | Endpoint de connexion (optionnel) |
+| `VITE_LOGIN_PATH` | build | `/api/auth/login-web` | Endpoint de connexion (optionnel) |
 
 ## Prérequis
 
@@ -93,14 +93,15 @@ D’autres chemins optionnels (`VITE_PRET_*`, `VITE_ETAT_*`, etc.) peuvent être
 
 | Couche | Fichier | Rôle |
 |--------|---------|------|
-| **Build** | `Dockerfile`, `.gitlab-ci.yml` | Injecte `VITE_API_BASE` au `npm run build` |
-| **HTTP** | `src/services/http.ts` | `apiFetch()` — préfixe `VITE_API_BASE` + chemin `/api/...` |
-| **Auth** | `src/services/auth.ts` | Login / reset password via `VITE_API_BASE` + `VITE_LOGIN_PATH` |
+| **Build** | `Dockerfile` | `VITE_API_BASE=""` → appels relatifs `/api/...` |
+| **Runtime** | `docker/nginx/default.conf.template` | Nginx proxy `/api` → `API_UPSTREAM` |
+| **HTTP** | `src/services/http.ts` | `apiFetch()` — préfixe vide + chemin `/api/...` |
+| **Auth** | `src/services/auth.ts` | Login via `/api/auth/...` (même origine) |
 | **Services** | `src/services/*.ts` | Un module par domaine (user, client, prêt, état…) |
 | **Dev proxy** | `vite.config.ts` | Redirige `/api` → `VITE_API_PROXY_TARGET` si défini |
 | **Vercel** | `api/proxy.ts` | Proxy serverless (optionnel) |
 
-En **production Docker**, l’URL API est **figée dans le bundle** au moment du build CI.
+En **Docker**, le navigateur appelle `https://<front>:9080/api/...` ; Nginx relaie vers `https://coopec.djogana-pay.com:9091` (configurable via `API_UPSTREAM`).
 
 ## Architecture — diagrammes de séquence
 
@@ -164,8 +165,12 @@ sequenceDiagram
   Runner->>Docker: docker run -p 9080:8010
   Note over Nginx: SPA statique
   Note over API: Appels navigateur directs vers :9091
-  Dev->>Nginx: http://serveur:9080
+  Dev->>Nginx: http://coopec-test:9080
   Nginx-->>Dev: index.html + assets JS
+  Dev->>Nginx: POST /api/auth/login-web
+  Nginx->>API: proxy → coopec.djogana-pay.com:9091
+  API-->>Nginx: token + profil
+  Nginx-->>Dev: réponse JSON
 ```
 
 ## Structure du projet
@@ -174,7 +179,7 @@ sequenceDiagram
 coopec-interface/
 ├── .gitlab-ci.yml          # Pipeline deploy-dev / deploy-production
 ├── Dockerfile              # Build Vite + image Nginx
-├── docker/nginx/           # Config Nginx (port 8010, SPA fallback)
+├── docker/nginx/           # Template Nginx + entrypoint (proxy /api)
 ├── vite.config.ts          # Alias @, proxy /api en dev
 ├── api/proxy.ts            # Proxy Vercel (optionnel)
 ├── docs/                   # État des lieux (Word)
@@ -332,19 +337,25 @@ Le fichier `.gitlab-ci.yml` construit l’image et lance le conteneur :
 
 ```bash
 docker build -t coopec_web_v2:<commit> .
-docker run --restart always -d -p 9080:8010 --name coopec_web_v2 coopec_web_v2:<commit>
+docker run --restart always -d -p 9080:8010 \
+  -e API_UPSTREAM="https://coopec.djogana-pay.com:9091" \
+  -e API_UPSTREAM_HOST="coopec.djogana-pay.com" \
+  --name coopec_web_v2 coopec_web_v2:<commit>
 ```
 
 - **Dockerfile** : build Vite + Nginx (écoute **8010** dans le conteneur)
-- **Mapping** : `-p 9080:8010` (hôte **9080** → conteneur **8010**, API sur **9091**)
+- **Mapping** : `-p 9080:8010` (hôte **9080** → conteneur **8010**)
+- **API** : proxy Nginx `/api` → `API_UPSTREAM` (défaut `https://coopec.djogana-pay.com:9091`)
 - **Nom du conteneur** : `$CI_PROJECT_NAME` (= `coopec_web_v2`)
 
 Build manuel local :
 
 ```bash
-docker build --build-arg VITE_API_BASE="https://coopeccollect.djogana-pay.com:9091" -t coopec-interface .
-docker run --rm -p 9080:8010 coopec-interface
-# → http://localhost:9080
+docker build -t coopec-interface .
+docker run --rm -p 9080:8010 \
+  -e API_UPSTREAM="https://coopec.djogana-pay.com:9091" \
+  coopec-interface
+# → http://localhost:9080  (API via /api/...)
 ```
 
 ## Branches
