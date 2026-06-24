@@ -43,6 +43,7 @@ Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (défaut : **
 |----------|---------------|---------|------|
 | `API_UPSTREAM` | les deux | `http://host.docker.internal:9091` | Proxy Nginx → API sur l’**hôte** Docker |
 | `API_UPSTREAM_HOST` | les deux | `coopec.djogana-pay.com` | En-tête `Host` attendu par l’API Java |
+| `API_PUBLIC_ORIGIN` | les deux | `https://coopec.djogana-pay.com:9091` | `Origin` / `Referer` envoyés au backend (anti-403) |
 | `APP_HOST_PORT` | les deux | `9080` | Port hôte de l’interface (conteneur : 8010) |
 | `VITE_LOGIN_PATH` | build | `/api/auth/login-web` | Endpoint de connexion (optionnel) |
 

@@ -11,6 +11,7 @@ variables:
  
   - export API_UPSTREAM="${API_UPSTREAM:-http://host.docker.internal:9091}"
   - export API_UPSTREAM_HOST="${API_UPSTREAM_HOST:-coopec.djogana-pay.com}"
+  - export API_PUBLIC_ORIGIN="${API_PUBLIC_ORIGIN:-https://coopec.djogana-pay.com:9091}"
   - docker build
       --build-arg VITE_API_BASE=""
       --build-arg VITE_LOGIN_PATH="${VITE_LOGIN_PATH:-/api/auth/login-web}"
@@ -26,6 +27,7 @@ variables:
       --add-host=host.docker.internal:host-gateway
       -e API_UPSTREAM="${API_UPSTREAM}"
       -e API_UPSTREAM_HOST="${API_UPSTREAM_HOST}"
+      -e API_PUBLIC_ORIGIN="${API_PUBLIC_ORIGIN}"
       --name $CI_PROJECT_NAME
       $DOCKER_IMAGE
   - sleep 5
