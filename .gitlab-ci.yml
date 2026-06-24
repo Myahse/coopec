@@ -34,8 +34,13 @@ variables:
   - docker ps --filter name=$CI_PROJECT_NAME
   - docker logs --tail 50 $CI_PROJECT_NAME
   - |
-    echo "Test connectivité API depuis le conteneur..."
-    docker exec $CI_PROJECT_NAME wget -q -S -O /dev/null --timeout=10 "${API_UPSTREAM}/api/auth/login-web" 2>&1 | head -5 || true
+    echo "Test POST login depuis le conteneur..."
+    docker exec $CI_PROJECT_NAME wget -q -S -O - --timeout=15 \
+      --header="Content-Type: application/json" \
+      --header="Accept: application/json" \
+      --header="X-Requested-With: XMLHttpRequest" \
+      --post-data='{"username":"test","password":"test"}' \
+      "http://127.0.0.1:8010/api/auth/login-web" 2>&1 | head -20 || true
 
 # ---------- DÉVELOPPEMENT (branche develop) ----------
 deploy-dev:

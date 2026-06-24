@@ -8,7 +8,7 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
 
-    # Proxy API — même origine navigateur ; en-têtes backend comme vite.config / api/proxy.ts
+    # Proxy API — en-têtes backend alignés sur vite.config / api/proxy.ts
     location /api/ {
         proxy_pass ${API_UPSTREAM};
         proxy_http_version 1.1;
@@ -21,17 +21,25 @@ server {
         proxy_ssl_server_name on;
         proxy_ssl_verify off;
 
+        # Ne pas transmettre Origin/Referer du navigateur (coopec-test) — API les refuse (403)
         proxy_set_header Host ${API_UPSTREAM_HOST};
         proxy_set_header Origin ${API_PUBLIC_ORIGIN};
         proxy_set_header Referer ${API_PUBLIC_ORIGIN}/;
         proxy_set_header X-Requested-With "XMLHttpRequest";
+
+        # Corps de la requête client (login, etc.)
         proxy_set_header Accept $http_accept;
         proxy_set_header Content-Type $http_content_type;
-        proxy_set_header Authorization $http_authorization;
-        proxy_set_header X-Auth-Token $http_x_auth_token;
+        proxy_set_header Content-Length $content_length;
+
+        # Ne pas envoyer Authorization / X-Auth-Token vides (Spring → 403)
+        # Les en-têtes auth du client passent seuls s'ils sont présents.
+
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host ${API_UPSTREAM_HOST};
+        proxy_set_header X-Forwarded-Port 9091;
         proxy_set_header Connection "";
 
         proxy_cookie_domain ${API_UPSTREAM_HOST} $host;
