@@ -42,8 +42,8 @@ Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (défaut : **
 | Variable | Environnement | Exemple | Rôle |
 |----------|---------------|---------|------|
 | `API_UPSTREAM` | les deux | `http://host.docker.internal:9091` | Proxy Nginx → API sur l’**hôte** Docker |
-| `API_UPSTREAM_HOST` | les deux | `coopec.djogana-pay.com` | En-tête `Host` attendu par l’API Java |
-| `API_PUBLIC_ORIGIN` | les deux | `https://coopec.djogana-pay.com:9091` | `Origin` / `Referer` envoyés au backend (anti-403) |
+| `API_UPSTREAM_HOST` | les deux | `coopeccollect.djogana-pay.com` | En-tête `Host` (identique au proxy Vite local) |
+| `API_PUBLIC_ORIGIN` | les deux | `https://coopeccollect.djogana-pay.com:9091` | `Origin` / `Referer` vers le backend |
 | `APP_HOST_PORT` | les deux | `9080` | Port hôte de l’interface (conteneur : 8010) |
 | `VITE_LOGIN_PATH` | build | `/api/auth/login-web` | Endpoint de connexion (optionnel) |
 
@@ -343,7 +343,7 @@ docker build -t coopec_web_v2:<commit> .
 docker run --restart always -d -p 9080:8010 \
   --add-host=host.docker.internal:host-gateway \
   -e API_UPSTREAM="http://host.docker.internal:9091" \
-  -e API_UPSTREAM_HOST="coopec.djogana-pay.com" \
+  -e API_UPSTREAM_HOST="coopeccollect.djogana-pay.com" \
   --name coopec_web_v2 coopec_web_v2:<commit>
 ```
 

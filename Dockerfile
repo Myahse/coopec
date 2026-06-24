@@ -27,8 +27,8 @@ RUN chmod +x /docker-entrypoint.sh
 COPY --from=build /app/dist /usr/share/nginx/html
 
 ENV API_UPSTREAM="http://host.docker.internal:9091"
-ENV API_UPSTREAM_HOST="coopec.djogana-pay.com"
-ENV API_PUBLIC_ORIGIN="https://coopec.djogana-pay.com:9091"
+ENV API_UPSTREAM_HOST="coopeccollect.djogana-pay.com"
+ENV API_PUBLIC_ORIGIN="https://coopeccollect.djogana-pay.com:9091"
 
 EXPOSE 8010
 

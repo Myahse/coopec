@@ -2,8 +2,8 @@
 set -e
 
 export API_UPSTREAM="${API_UPSTREAM:-http://host.docker.internal:9091}"
-export API_UPSTREAM_HOST="${API_UPSTREAM_HOST:-coopec.djogana-pay.com}"
-export API_PUBLIC_ORIGIN="${API_PUBLIC_ORIGIN:-https://coopec.djogana-pay.com:9091}"
+export API_UPSTREAM_HOST="${API_UPSTREAM_HOST:-coopeccollect.djogana-pay.com}"
+export API_PUBLIC_ORIGIN="${API_PUBLIC_ORIGIN:-https://coopeccollect.djogana-pay.com:9091}"
 
 echo "Nginx API proxy: upstream=${API_UPSTREAM} host=${API_UPSTREAM_HOST} origin=${API_PUBLIC_ORIGIN}"
 
