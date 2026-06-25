@@ -34,6 +34,7 @@ const TOUS_COLLECTEUR = '__tous__'
 
 type SortKey = 'date' | 'reference' | 'montant' | 'collecteur' | 'client' | 'motif' | 'carte'
 
+//
 type AnnulationRow = {
   rowKey: string
   date: string
@@ -44,7 +45,7 @@ type AnnulationRow = {
   motif: string
   carte: string
 }
-
+//
 const COLUMNS: { key: SortKey; label: string; align?: 'left' | 'right' }[] = [
   { key: 'date', label: 'DATE' },
   { key: 'reference', label: 'REFERENCE' },

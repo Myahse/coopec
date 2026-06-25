@@ -16,26 +16,26 @@ Interface web de gestion **Coopec Collect** — tableau de bord, administration,
 
 | Contexte | Port / URL | Description |
 |----------|------------|-------------|
-| **Interface web (Docker)** | Hôte **9080** → conteneur **8010** | Front React/Nginx — déploiement GitLab CI |
+| **Interface web (Docker)** | Hôte **9088** → conteneur **8010** | Front React/Nginx — déploiement GitLab CI |
 | **API Coopec (backend)** | https://coopeccollect.djogana-pay.com:**9091** | API Java — **ne pas réutiliser le port 9091 pour le front** |
 | **Dev local (Vite)** | http://localhost:5173 | `npm run dev` — proxy `/api` via `VITE_API_PROXY_TARGET` |
 | **Preview build local** | http://localhost:4173 | `npm run preview` après `npm run build` |
 
-> Sur le serveur `peya-pay-test-2`, le port **9091** est occupé par l’API backend. L’interface web est exposée sur le port hôte **9080** (Nginx écoute **8010** dans le conteneur).
+> Sur le serveur `peya-pay-test-2`, le port **9091** est occupé par l’API backend. L’interface web est exposée sur le port hôte **9088** (Nginx écoute **8010** dans le conteneur).
 
 ### Déploiement par branche
 
 | Branche | Job GitLab | Runner tag | Port interface | Déclenchement |
 |---------|------------|------------|----------------|---------------|
-| `develop` | `deploy-dev` | `build` | **9080** (→ 8010) | Push sur `develop` |
-| `production` | `deploy-production` | `production` | **9080** (→ 8010) | Push sur `production` |
+| `develop` | `deploy-dev` | `build` | **9088** (→ 8010) | Push sur `develop` |
+| `production` | `deploy-production` | `production` | **9088** (→ 8010) | Push sur `production` |
 
 Après déploiement, l’interface est accessible sur :
 
-- **Développement** : `http://<serveur-runner-build>:9080`
-- **Production** : `http://<serveur-runner-production>:9080`
+- **Développement** : `http://<serveur-runner-build>:9088`
+- **Production** : `http://<serveur-runner-production>:9088`
 
-Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (défaut : **9080**).
+Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (défaut : **9088**).
 
 ### Variables CI/CD recommandées (GitLab → Settings → CI/CD → Variables)
 
@@ -44,7 +44,7 @@ Le port hôte est surchargeable via la variable CI `APP_HOST_PORT` (défaut : **
 | `API_UPSTREAM` | les deux | `http://host.docker.internal:9091` | Proxy Nginx → API sur l’**hôte** Docker |
 | `API_UPSTREAM_HOST` | les deux | `coopeccollect.djogana-pay.com` | En-tête `Host` (identique au proxy Vite local) |
 | `API_PUBLIC_ORIGIN` | les deux | `https://coopeccollect.djogana-pay.com:9091` | `Origin` / `Referer` vers le backend |
-| `APP_HOST_PORT` | les deux | `9080` | Port hôte de l’interface (conteneur : 8010) |
+| `APP_HOST_PORT` | les deux | `9088` | Port hôte de l’interface (conteneur : 8010) |
 | `VITE_LOGIN_PATH` | build | `/api/auth/login-web` | Endpoint de connexion (optionnel) |
 
 ## Prérequis
@@ -102,7 +102,7 @@ D’autres chemins optionnels (`VITE_PRET_*`, `VITE_ETAT_*`, etc.) peuvent être
 | **Dev proxy** | `vite.config.ts` | Redirige `/api` → `VITE_API_PROXY_TARGET` si défini |
 | **Vercel** | `api/proxy.ts` | Proxy serverless (optionnel) |
 
-En **Docker**, le navigateur appelle `https://<front>:9080/api/...` ; Nginx relaie vers l’API sur l’hôte (`host.docker.internal:9091` par défaut).
+En **Docker**, le navigateur appelle `https://<front>:9088/api/...` ; Nginx relaie vers l’API sur l’hôte (`host.docker.internal:9091` par défaut).
 
 > **504 Gateway Timeout** : le conteneur n’atteint pas l’API. Par défaut on utilise `http://host.docker.internal:9091` (API sur le même serveur que Docker). Si l’API est sur une autre machine, définir `API_UPSTREAM` dans GitLab (ex. `https://coopec.djogana-pay.com:9091`) et ouvrir le firewall sortant port 9091.
 
@@ -165,10 +165,10 @@ sequenceDiagram
   GL->>Runner: job deploy-dev
   Runner->>Docker: docker build --build-arg VITE_API_BASE=...
   Docker->>Docker: npm run build (Vite)
-  Runner->>Docker: docker run -p 9080:8010
+  Runner->>Docker: docker run -p 9088:8010
   Note over Nginx: SPA statique
   Note over API: Appels navigateur directs vers :9091
-  Dev->>Nginx: http://coopec-test:9080
+  Dev->>Nginx: http://coopec-test:9088
   Nginx-->>Dev: index.html + assets JS
   Dev->>Nginx: POST /api/auth/login-web
   Nginx->>API: proxy → coopec.djogana-pay.com:9091
@@ -340,7 +340,7 @@ Le fichier `.gitlab-ci.yml` construit l’image et lance le conteneur :
 
 ```bash
 docker build -t coopec_web_v2:<commit> .
-docker run --restart always -d -p 9080:8010 \
+docker run --restart always -d -p 9088:8010 \
   --add-host=host.docker.internal:host-gateway \
   -e API_UPSTREAM="http://host.docker.internal:9091" \
   -e API_UPSTREAM_HOST="coopeccollect.djogana-pay.com" \
@@ -348,7 +348,7 @@ docker run --restart always -d -p 9080:8010 \
 ```
 
 - **Dockerfile** : build Vite + Nginx (écoute **8010** dans le conteneur)
-- **Mapping** : `-p 9080:8010` (hôte **9080** → conteneur **8010**)
+- **Mapping** : `-p 9088:8010` (hôte **9088** → conteneur **8010**)
 - **API** : proxy Nginx `/api` → `API_UPSTREAM` (défaut `http://host.docker.internal:9091`)
 - **Nom du conteneur** : `$CI_PROJECT_NAME` (= `coopec_web_v2`)
 
@@ -356,11 +356,11 @@ Build manuel local :
 
 ```bash
 docker build -t coopec-interface .
-docker run --rm -p 9080:8010 \
+docker run --rm -p 9088:8010 \
   --add-host=host.docker.internal:host-gateway \
   -e API_UPSTREAM="http://host.docker.internal:9091" \
   coopec-interface
-# → http://localhost:9080  (API via /api/...)
+# → http://localhost:9088  (API via /api/...)
 ```
 
 ## Branches
