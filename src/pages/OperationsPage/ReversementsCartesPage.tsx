@@ -141,7 +141,7 @@ export function ReversementsCartesPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [carteFilter, dateDebut, dateFin, orgFilters])
+  }, [carteFilter, dateDebut, dateFin, orgFilters.agenceCode, orgFilters.getScopeError])
 
   const filteredSorted = useMemo(() => {
     let out = rows

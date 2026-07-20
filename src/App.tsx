@@ -15,6 +15,7 @@ import { ConfigurationTypePretPage } from './pages/TypePretPage/ConfigurationTyp
 import { CollecteursPage } from './pages/CollecteursPage/CollecteursPage'
 import { ClientsPage } from './pages/ClientsPage/ClientsPage'
 import { CoopecInstitutionsPage } from './pages/CoopecInstitutionsPage/CoopecInstitutionsPage'
+import { InstitutionPage } from './pages/InstitutionPage/InstitutionPage'
 import { AbonnementsPage } from './pages/AbonnementsPage/AbonnementsPage'
 import { ArretesAnnulationsPage } from './pages/OperationsPage/ArretesAnnulationsPage'
 import { ValidationsArretesPage } from './pages/OperationsPage/ValidationsArretesPage'
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="utilisateurs" element={<UserManagementPage />} />
             <Route path="collecteurs" element={<CollecteursPage />} />
             <Route path="clients" element={<ClientsPage />} />
+            <Route path="institution" element={<InstitutionPage />} />
             <Route path="coopec" element={<CoopecInstitutionsPage />} />
             <Route path="abonnements" element={<AbonnementsPage />} />
             <Route path="agences" element={<AgenceManagementPage />} />

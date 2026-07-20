@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { listCollecteursParAgence, listCollecteursAvecSoldeParAgence } from '@/services/collecteur'
+import { mapCollecteurSelectOptions } from '@/utils/collecteur-select-options'
 import { useDirectionAgenceFilters } from '@/hooks/use-direction-agence-filters'
 import { getClientCollecteur } from '@/services/client'
 import {
@@ -193,7 +194,10 @@ export function ArretesAnnulationsPage() {
     const q = collecteurSearch.trim().toLowerCase()
     if (!q) return collecteurs
     return collecteurs.filter(
-      (c) => c.label.toLowerCase().includes(q) || c.login.toLowerCase().includes(q),
+      (c) =>
+        c.label.toLowerCase().includes(q) ||
+        c.login.toLowerCase().includes(q) ||
+        (c.codeClient ?? '').toLowerCase().includes(q),
     )
   }, [collecteurs, collecteurSearch])
 
@@ -239,18 +243,13 @@ export function ArretesAnnulationsPage() {
     setViewMode('operations')
     try {
       const env = await listCollecteursParAgence(agence)
-      const list = extractListFromApiEnvelope(env) as Record<string, unknown>[]
-      setCollecteurs(
-        list
-          .map((r) => {
-            const login = String(r.login ?? r.loginclient ?? '').trim()
-            const nom = String(r.nomclient ?? r.nomCollecteur ?? login).trim()
-            const codeClient = String(r.codeClient ?? '').trim()
-            return { login, label: nom || login, codeClient: codeClient || undefined }
-          })
-          .filter((c) => c.login),
-      )
-      setSelectedLogin('')
+      const next = mapCollecteurSelectOptions(extractListFromApiEnvelope(env)).map((o) => ({
+        login: o.value,
+        label: o.label,
+        codeClient: o.codeClient,
+      }))
+      setCollecteurs(next)
+      setSelectedLogin((prev) => (prev && next.some((c) => c.login === prev) ? prev : ''))
       setRowsAvecCompte([])
       setRowsSansCompte([])
     } catch (err) {
@@ -259,7 +258,7 @@ export function ArretesAnnulationsPage() {
     } finally {
       setIsLoadingCollecteurs(false)
     }
-  }, [agence, orgFilters])
+  }, [agence, orgFilters.getScopeError])
 
   const loadSoldesCollecteurs = useCallback(async () => {
     const scopeError = orgFilters.getScopeError()
@@ -281,7 +280,7 @@ export function ArretesAnnulationsPage() {
     } finally {
       setSoldesLoading(false)
     }
-  }, [agence, orgFilters])
+  }, [agence, orgFilters.getScopeError])
 
   function exportSoldesXls() {
     exportJsonToXlsx(
@@ -327,6 +326,17 @@ export function ArretesAnnulationsPage() {
       }
     },
     [dateDebut, dateFin],
+  )
+
+  const selectCollecteur = useCallback(
+    (login: string) => {
+      const next = String(login ?? '').trim()
+      if (!next) return
+      setSelectedLogin(next)
+      setViewMode('operations')
+      void loadOperationsForCollecteur(next)
+    },
+    [loadOperationsForCollecteur],
   )
 
   const loadArretesList = useCallback(async () => {
@@ -398,17 +408,12 @@ export function ArretesAnnulationsPage() {
     } finally {
       setIsLoadingOps(false)
     }
-  }, [agence, dateDebut, dateFin, orgFilters, selectedLogin])
+  }, [agence, dateDebut, dateFin, orgFilters.getScopeError, selectedLogin])
 
   useEffect(() => {
     if (!agence) return
     void loadCollecteurs()
   }, [agence, loadCollecteurs])
-
-  useEffect(() => {
-    if (!selectedLogin || viewMode !== 'operations') return
-    void loadOperationsForCollecteur(selectedLogin)
-  }, [selectedLogin, viewMode, loadOperationsForCollecteur])
 
   async function handleFaireArrete() {
     if (!selectedCollecteur || !orgFilters.hasScope) {
@@ -554,49 +559,91 @@ export function ArretesAnnulationsPage() {
         </div>
       </DashboardSectionCard>
 
-      <DashboardSectionCard className="min-h-0 flex-1" contentClassName="flex min-h-0 flex-row gap-0 p-0">
-        <aside className="flex w-[220px] shrink-0 flex-col overflow-hidden rounded-l-xl ring-1 ring-border">
-          <div className="flex items-center justify-between bg-primary px-2 py-1.5 text-primary-foreground">
+      <DashboardSectionCard
+        className="min-h-0 flex-1"
+        contentClassName="flex min-h-0 h-full flex-row gap-0 overflow-hidden p-0"
+      >
+        <aside className="relative z-20 flex h-full w-[280px] shrink-0 flex-col border-r border-border bg-card">
+          <div className="flex shrink-0 items-center justify-between bg-primary px-2 py-1.5 text-primary-foreground">
             <span className="text-xs font-semibold">Collecteur</span>
             <Search className="size-3.5 opacity-80" aria-hidden />
           </div>
-          <div className="border-b border-border px-2 py-1">
+
+          <div className="shrink-0 space-y-2 border-b border-border px-2 py-2">
             <Input
-              className="h-7 text-xs"
-              placeholder="Rechercher…"
+              className="h-8 text-xs"
+              placeholder="Rechercher un collecteur…"
               value={collecteurSearch}
               onChange={(e) => setCollecteurSearch(e.target.value)}
             />
+            <FilterChoiceField
+              name="arretes-collecteur-select"
+              label="Sélection"
+              value={selectedLogin}
+              onValueChange={selectCollecteur}
+              options={collecteurs.map((c) => ({
+                value: c.login,
+                label: c.label === c.login ? c.login : `${c.label} — ${c.login}`,
+              }))}
+              disabled={isLoadingCollecteurs || !collecteurs.length}
+              placeholder={
+                isLoadingCollecteurs ? 'Chargement…' : 'Choisir un collecteur'
+              }
+              variant="select"
+              triggerClassName="h-8 w-full text-xs"
+              labelClassName="text-[10px] text-muted-foreground"
+            />
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+
+          <div
+            role="listbox"
+            aria-label="Liste des collecteurs"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          >
             {isLoadingCollecteurs ? (
               <div className="px-2 py-4 text-xs text-muted-foreground">Chargement…</div>
             ) : null}
             {!isLoadingCollecteurs && !filteredCollecteurs.length ? (
-              <div className="px-2 py-4 text-xs text-muted-foreground">
-                Aucun collecteur
-              </div>
+              <div className="px-2 py-4 text-xs text-muted-foreground">Aucun collecteur</div>
             ) : null}
             {filteredCollecteurs.map((c) => {
               const active = c.login === selectedLogin
+              const radioId = `collecteur-${c.login}`
               return (
-                <button
+                <label
                   key={c.login}
-                  type="button"
+                  htmlFor={radioId}
+                  role="option"
+                  aria-selected={active}
+                  title={`${c.label} (${c.login})`}
                   className={[
-                    'flex w-full flex-col items-start gap-0.5 border-b border-border/60 px-2 py-1.5 text-left text-xs hover:bg-muted/30',
-                    active ? 'bg-primary/10 font-medium' : '',
+                    'flex cursor-pointer items-start gap-2 border-b border-border/60 px-2.5 py-2.5',
+                    'hover:bg-muted/40',
+                    active ? 'bg-primary/15 ring-1 ring-inset ring-primary/25' : '',
                   ].join(' ')}
-                  onClick={() => setSelectedLogin(c.login)}
                 >
-                  <span className="truncate w-full">{c.label}</span>
-                </button>
+                  <input
+                    id={radioId}
+                    type="radio"
+                    name="arretes-collecteur-list"
+                    className="mt-0.5 size-3.5 shrink-0 accent-primary"
+                    checked={active}
+                    onChange={() => selectCollecteur(c.login)}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-medium leading-snug">{c.label}</span>
+                    <span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">
+                      {c.login}
+                      {c.codeClient ? ` · ${c.codeClient}` : ''}
+                    </span>
+                  </span>
+                </label>
               )
             })}
           </div>
         </aside>
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-r-xl ring-1 ring-border ring-inset">
+        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="flex min-h-0 flex-[3] flex-col border-b border-border">
             <div className={TABLE_SCROLL_AREA_CLASS}>
               <table className="min-w-[1100px] w-full border-collapse text-xs">

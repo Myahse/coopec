@@ -43,25 +43,20 @@ export function DashboardSectionsShell({ children }: Props) {
       return [
         {
           title: 'Institution',
-          content: f.institutionLocked ? (
-            <p className="text-sm font-medium text-foreground">{f.selectedInstitutionLabel}</p>
-          ) : (
-            <DrawerListPicker
-              items={[{ value: 'Toutes', label: 'Toutes' }, ...f.institutionOptionsAll]}
-              selectedValue={f.institution}
-              onSelect={(v) => {
-                f.setInstitution(v)
-                setIsSectionDrawerOpen(false)
-              }}
-              emptyLabel="Aucune institution chargée."
-            />
+          content: (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">
+                {f.selectedInstitutionLabel || f.institution}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Paramètres généraux, messagerie, FTP et état de l’institution connectée.
+              </p>
+            </div>
           ),
-          hideAction: f.institutionLocked,
-          actionLabel: 'Gérer via filtre',
+          actionLabel: 'Ouvrir',
           onAction: () => {
             setIsSectionDrawerOpen(false)
-            f.setFiltersTarget('institution')
-            f.setIsFiltersDrawerOpen(true)
+            navigate('/dashboard/institution')
           },
         },
         {

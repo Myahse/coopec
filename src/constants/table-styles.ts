@@ -32,7 +32,7 @@ export const DASHBOARD_PAGE_TITLE_CLASS =
   'truncate text-2xl font-semibold tracking-tight text-foreground'
 
 export const DASHBOARD_TABLE_PAGE_BODY_CLASS =
-  'flex min-h-0 min-w-0 flex-1 flex-col gap-4 px-4 pb-4 lg:px-6'
+  'flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4 lg:px-6'
 
 /** `border-collapse` enables global vertical column separators (see index.css). */
 export const TABLE_CLASS = 'w-full border-collapse text-xs'

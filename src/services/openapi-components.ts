@@ -307,17 +307,11 @@ export type ArreteValidationDto = {
 }
 
 export type ValiderArreteCollecteurDto = {
-  compteToCredit?: string
-  montant?: number
-  codeAgence?: string
-  login?: string
-  referenceOperation?: string
-  /** Champs historiques  */
-  date?: string
-  loginCollecteur?: string
-  montantConstate?: number
-  reference?: string
-  codeClientCollecteur?: string
+  compteToCredit: string
+  montant: number
+  codeAgence: string
+  login: string
+  referenceOperation: string
 }
 
 export type ApiResponseListArreteValidationDto = {
@@ -428,6 +422,23 @@ export type InstitutionDto = {
   cptsfd?: string
   etat?: string
   montantMise?: number | string
+  /** Champs UI legacy (souvent présents côté API même hors OpenAPI minimal). */
+  objetMailChangementPassword?: string
+  objetMailConnexion?: string
+  adresseSmtpServeurMail?: string
+  adresseMailEnvoi?: string
+  motDePasseMailEnvoi?: string
+  nombreJoursExpirationMotDePasse?: number | string
+  nombreJoursDesactivationClient?: number | string
+  longueurLoginMotDePasse?: number | string
+  natureMotDePasse?: string
+  messageParametresConnexion?: string
+  messageChangementParametresConnexion?: string
+  messageCreationAbonnement?: string
+  tempsLatenceCollectrices?: number | string
+  natureDonnees?: string
+  /** Base64 data URL or absolute URL returned by API */
+  logo?: string
 }
 
 export type WDirectionRegionalDto = {

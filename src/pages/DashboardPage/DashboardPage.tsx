@@ -420,7 +420,13 @@ export function DashboardPage() {
             </Button>
 
             <div className="w-full max-w-md sm:max-w-none sm:w-96">
-              <Select value={collecteurSelected} onValueChange={setCollecteurSelected}>
+              <Select
+                value={collecteurSelected}
+                onValueChange={(v) => {
+                  if (v == null || v === '') return
+                  setCollecteurSelected(v)
+                }}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue
                     placeholder={
@@ -434,11 +440,14 @@ export function DashboardPage() {
                     {collecteurSelectedLabel}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent align="start" alignItemWithTrigger={false} className="max-h-72 min-w-[280px]">
                   <SelectItem value="Tous">Tous</SelectItem>
                   {collecteursOptions.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                    <SelectItem key={o.value} value={o.value} title={`${o.label} (${o.value})`}>
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate">{o.label}</span>
+                        <span className="truncate font-mono text-[10px] text-muted-foreground">{o.value}</span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

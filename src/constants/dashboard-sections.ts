@@ -27,6 +27,7 @@ const DASHBOARD_PAGE_SECTION_ROUTES: ReadonlyArray<{ prefix: string; section: st
   { prefix: '/dashboard/extraction-txt-superviseur', section: 'Administration' },
   { prefix: '/dashboard/cartes-clientele', section: 'Administration' },
   { prefix: '/dashboard/objectifs', section: 'Administration' },
+  { prefix: '/dashboard/institution', section: 'Administration' },
   { prefix: '/dashboard/coopec', section: 'Administration' },
   { prefix: '/dashboard/agences', section: 'Administration' },
   { prefix: '/dashboard/abonnements', section: 'Administration' },

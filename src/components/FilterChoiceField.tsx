@@ -74,17 +74,28 @@ export function FilterChoiceField<T extends string = string>({
   return (
     <div className={cn('grid gap-1', className)}>
       {label ? <Label className={labelClassName}>{label}</Label> : null}
-      <Select value={value || undefined} onValueChange={onValueChange} disabled={disabled || !options.length}>
-        <SelectTrigger className={triggerClassName ?? 'h-8 w-[220px] text-xs'}>
+      <Select
+        value={value || undefined}
+        onValueChange={(v) => {
+          if (v == null || v === '') return
+          onValueChange(v as T)
+        }}
+        disabled={disabled || !options.length}
+      >
+        <SelectTrigger className={triggerClassName ?? 'h-8 min-w-[220px] w-[min(100%,280px)] text-xs'}>
           <SelectValue placeholder={placeholder ?? label ?? 'Choisir'}>
             {selectedLabel || placeholder}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent
+          align="start"
+          alignItemWithTrigger={false}
+          className="min-w-[280px] max-w-[min(90vw,420px)]"
+        >
           {options.length ? (
             options.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                <span className="truncate">{opt.label}</span>
               </SelectItem>
             ))
           ) : (

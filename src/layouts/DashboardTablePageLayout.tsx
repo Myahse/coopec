@@ -56,9 +56,9 @@ export function DashboardTablePageLayout({
               {cardDescription ? <CardDescription>{cardDescription}</CardDescription> : null}
             </CardHeader>
           ) : null}
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-4 pt-4">
-            {toolbar}
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden pt-4">
+            {toolbar ? <div className="shrink-0">{toolbar}</div> : null}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{children}</div>
             {pagination ? <div className="shrink-0">{pagination}</div> : null}
             {footer ? <div className="shrink-0">{footer}</div> : null}
           </CardContent>

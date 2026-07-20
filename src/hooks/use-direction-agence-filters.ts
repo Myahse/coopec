@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDashboardFilters } from '@/contexts/DashboardFiltersContext'
 import { getAgencesByDirection, getDirectionRegionaleOptions } from '@/services/direction-regionale'
 import { extractListFromApiEnvelope } from '@/utils/api-envelope'
@@ -19,6 +19,8 @@ export type UseDirectionAgenceFiltersOptions = {
 export function useDirectionAgenceFilters(options: UseDirectionAgenceFiltersOptions = {}) {
   const { allowAllAgencies = false, onScopeChange } = options
   const f = useDashboardFilters()
+  const onScopeChangeRef = useRef(onScopeChange)
+  onScopeChangeRef.current = onScopeChange
 
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [filterDirection, setFilterDirectionState] = useState('')
@@ -40,14 +42,14 @@ export function useDirectionAgenceFilters(options: UseDirectionAgenceFiltersOpti
     if (!codeDir) return '—'
     const hit = directionChoices.find((d) => d.value === codeDir)
     return hit?.label || f.labelForDirectionCode(codeDir)
-  }, [codeDir, directionChoices, f])
+  }, [codeDir, directionChoices, f.labelForDirectionCode])
 
   const selectedAgencyLabel = useMemo(() => {
     if (!filterAgence) return '—'
     if (allAgenciesSelected) return 'Toutes les agences'
     const hit = agencyChoices.find((a) => a.value === filterAgence)
     return hit?.label || f.labelForAgencyCode(filterAgence)
-  }, [agencyChoices, allAgenciesSelected, f, filterAgence])
+  }, [agencyChoices, allAgenciesSelected, f.labelForAgencyCode, filterAgence])
 
   const agencyCodesForQuery = useMemo(() => {
     if (allAgenciesSelected) return agencyChoices.map((a) => a.value)
@@ -64,32 +66,26 @@ export function useDirectionAgenceFilters(options: UseDirectionAgenceFiltersOpti
       }
     }
     return map
-  }, [agencyChoices, f, selectedDirectionLabel])
+  }, [agencyChoices, f.labelForAgencyCode, selectedDirectionLabel])
 
   const hasScope = Boolean(codeDir && filterAgence)
 
-  const setFilterDirection = useCallback(
-    (value: string) => {
-      setFilterDirectionState(value)
-      setFilterAgenceState('')
-      onScopeChange?.()
-    },
-    [onScopeChange],
-  )
+  const setFilterDirection = useCallback((value: string) => {
+    setFilterDirectionState(value)
+    setFilterAgenceState('')
+    onScopeChangeRef.current?.()
+  }, [])
 
-  const setFilterAgence = useCallback(
-    (value: string) => {
-      setFilterAgenceState(value)
-      onScopeChange?.()
-    },
-    [onScopeChange],
-  )
+  const setFilterAgence = useCallback((value: string) => {
+    setFilterAgenceState(value)
+    onScopeChangeRef.current?.()
+  }, [])
 
   const resetFilters = useCallback(() => {
     setFilterDirectionState('')
     setFilterAgenceState('')
-    onScopeChange?.()
-  }, [onScopeChange])
+    onScopeChangeRef.current?.()
+  }, [])
 
   const getScopeError = useCallback((): string | null => {
     if (!codeDir) return 'Sélectionnez une direction régionale.'
@@ -190,28 +186,51 @@ export function useDirectionAgenceFilters(options: UseDirectionAgenceFiltersOpti
     }
   }, [agencyChoices, f.agency, filterAgence, filterDirection])
 
-  return {
-    isFilterOpen,
-    setIsFilterOpen,
-    filterDirection,
-    filterAgence,
-    setFilterDirection,
-    setFilterAgence,
-    directionChoices,
-    agencyChoices,
-    agenceSelectOptions,
-    isLoadingAgencies,
-    selectedDirectionLabel,
-    selectedAgencyLabel,
-    codeDir,
-    agenceCode,
-    allAgenciesSelected,
-    agencyCodesForQuery,
-    agencyLabels,
-    hasScope,
-    resetFilters,
-    getScopeError,
-  }
+  return useMemo(
+    () => ({
+      isFilterOpen,
+      setIsFilterOpen,
+      filterDirection,
+      filterAgence,
+      setFilterDirection,
+      setFilterAgence,
+      directionChoices,
+      agencyChoices,
+      agenceSelectOptions,
+      isLoadingAgencies,
+      selectedDirectionLabel,
+      selectedAgencyLabel,
+      codeDir,
+      agenceCode,
+      allAgenciesSelected,
+      agencyCodesForQuery,
+      agencyLabels,
+      hasScope,
+      resetFilters,
+      getScopeError,
+    }),
+    [
+      isFilterOpen,
+      filterDirection,
+      filterAgence,
+      setFilterDirection,
+      setFilterAgence,
+      directionChoices,
+      agencyChoices,
+      agenceSelectOptions,
+      isLoadingAgencies,
+      selectedDirectionLabel,
+      selectedAgencyLabel,
+      codeDir,
+      agenceCode,
+      allAgenciesSelected,
+      agencyCodesForQuery,
+      agencyLabels,
+      hasScope,
+      resetFilters,
+      getScopeError,
+    ],
+  )
 }
 
 export type DirectionAgenceFiltersState = ReturnType<typeof useDirectionAgenceFilters>

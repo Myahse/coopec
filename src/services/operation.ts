@@ -186,6 +186,7 @@ function mapArreteToValidListToValidationRows(list: ArreteToValidListItem[]): Ar
     reference: r.x6,
     loginCollecteur: r.loginpoint,
     compteLes: r.x3,
+    compteLce: r.x3,
   }))
 }
 
@@ -240,10 +241,30 @@ export function extractArreteToValidList(env: unknown): ArreteToValidListItem[] 
 export async function validerArreteCollecteur(
   body: ValiderArreteCollecteurDto,
 ): Promise<ApiResponseString> {
+  const compteToCredit = String(body.compteToCredit ?? '').trim()
+  const codeAgence = String(body.codeAgence ?? '').trim()
+  const login = String(body.login ?? '').trim()
+  const referenceOperation = String(body.referenceOperation ?? '').trim()
+  const montant = Number(body.montant)
+
+  if (!compteToCredit) throw new Error('compteToCredit is required')
+  if (!codeAgence) throw new Error('codeAgence is required')
+  if (!login) throw new Error('login is required')
+  if (!referenceOperation) throw new Error('referenceOperation is required')
+  if (!Number.isFinite(montant)) throw new Error('montant is required')
+
+  const payload: ValiderArreteCollecteurDto = {
+    compteToCredit,
+    montant,
+    codeAgence,
+    login,
+    referenceOperation,
+  }
+
   const res = await apiFetch('/api/operation/valid-arrete-collect', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', accept: '*/*' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   })
   return readJsonIfOk<ApiResponseString>(res, `Validation arrêté failed (${res.status})`)
 }

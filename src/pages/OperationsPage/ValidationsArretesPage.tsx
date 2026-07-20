@@ -10,6 +10,7 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
@@ -98,6 +99,12 @@ export function ValidationsArretesPage() {
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [detailsRows, setDetailsRows] = useState<Summary[]>([])
   const [detailsError, setDetailsError] = useState<string | null>(null)
+
+  const [validateOpen, setValidateOpen] = useState(false)
+  const [compteToCredit, setCompteToCredit] = useState('')
+  const [montantValidation, setMontantValidation] = useState('')
+  const [loginValidation, setLoginValidation] = useState('')
+  const [referenceValidation, setReferenceValidation] = useState('')
 
   const agence = useMemo(() => {
     const a = f.agency !== 'Toutes' ? f.agency.trim() : ''
@@ -195,28 +202,84 @@ export function ValidationsArretesPage() {
     }
   }
 
-  async function handleValidate() {
+  function openValidateSheet() {
     if (!selectedRow || !agence) {
       setError('Sélectionnez un collecteur dans le tableau.')
       return
     }
-    const login = selectedRow.loginCollecteur ?? selectedRow.codeCollecteur
+    const login =
+      (selectedRow.loginCollecteur ?? selectedRow.codeCollecteur ?? getConnectedUserLogin()).trim()
+    const reference = String(selectedRow.reference ?? '').trim()
+    const compte = String(selectedRow.compteLce ?? selectedRow.compteLes ?? '').trim()
+    const montant =
+      selectedRow.montantConstate ?? selectedRow.montantDeclare
+
     if (!login) {
-      setError('Identifiant collecteur manquant sur la ligne sélectionnée.')
+      setError('Identifiant collecteur (login) manquant sur la ligne sélectionnée.')
       return
     }
+    if (!reference) {
+      setError('Référence opération manquante sur la ligne sélectionnée.')
+      return
+    }
+    if (!compte) {
+      setError('Compte à créditer manquant (Compte LCE / LES).')
+      return
+    }
+    if (montant === undefined || !Number.isFinite(Number(montant))) {
+      setError('Montant constaté invalide.')
+      return
+    }
+
+    setLoginValidation(login)
+    setReferenceValidation(reference)
+    setCompteToCredit(compte)
+    setMontantValidation(String(montant))
+    setError(null)
+    setSuccess(null)
+    setValidateOpen(true)
+  }
+
+  async function handleValidate() {
+    if (!agence) {
+      setError('Sélectionnez une agence dans les filtres du tableau de bord.')
+      return
+    }
+    const compte = compteToCredit.trim()
+    const login = loginValidation.trim()
+    const referenceOperation = referenceValidation.trim()
+    const montant = parseMontantInput(montantValidation)
+
+    if (!compte) {
+      setError('compteToCredit est obligatoire.')
+      return
+    }
+    if (montant === undefined) {
+      setError('montant est obligatoire.')
+      return
+    }
+    if (!login) {
+      setError('login est obligatoire.')
+      return
+    }
+    if (!referenceOperation) {
+      setError('referenceOperation est obligatoire.')
+      return
+    }
+
     setIsValidating(true)
     setError(null)
     setSuccess(null)
     try {
       const res = await validerArreteCollecteur({
+        compteToCredit: compte,
+        montant,
         codeAgence: agence,
-        login: getConnectedUserLogin(),
-        montant: selectedRow.montantConstate,
-        referenceOperation: selectedRow.reference,
-        compteToCredit: selectedRow.compteLce ?? selectedRow.compteLes,
+        login,
+        referenceOperation,
       })
       setSuccess(res.message ?? 'Arrêté validé.')
+      setValidateOpen(false)
       await loadList('a-valider')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Validation impossible')
@@ -340,7 +403,7 @@ export function ValidationsArretesPage() {
                 variant="outline"
                 className="h-8 border-primary text-primary hover:bg-primary/10"
                 disabled={isValidating || !selectedRow || listMode === 'valides'}
-                onClick={() => void handleValidate()}
+                onClick={openValidateSheet}
               >
                 Valider l&apos;arrêté du collecteur
               </Button>
@@ -503,6 +566,68 @@ export function ValidationsArretesPage() {
               ))}
             </ul>
           </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={validateOpen} onOpenChange={setValidateOpen}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Valider l&apos;arrêté</SheetTitle>
+            <SheetDescription>
+              POST /api/operation/valid-arrete-collect — corps API exact.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-1 flex-col gap-3 px-4 py-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="val-compte">compteToCredit</Label>
+              <Input
+                id="val-compte"
+                className="font-mono text-xs"
+                value={compteToCredit}
+                onChange={(e) => setCompteToCredit(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="val-montant">montant</Label>
+              <Input
+                id="val-montant"
+                type="number"
+                className="text-xs tabular-nums"
+                value={montantValidation}
+                onChange={(e) => setMontantValidation(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="val-agence">codeAgence</Label>
+              <Input id="val-agence" className="font-mono text-xs" value={agence} readOnly />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="val-login">login</Label>
+              <Input
+                id="val-login"
+                className="font-mono text-xs"
+                value={loginValidation}
+                onChange={(e) => setLoginValidation(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="val-ref">referenceOperation</Label>
+              <Input
+                id="val-ref"
+                className="font-mono text-xs"
+                value={referenceValidation}
+                onChange={(e) => setReferenceValidation(e.target.value)}
+              />
+            </div>
+          </div>
+          <SheetFooter className="border-t border-border px-4 py-3">
+            <Button type="button" variant="outline" onClick={() => setValidateOpen(false)} disabled={isValidating}>
+              Annuler
+            </Button>
+            <Button type="button" onClick={() => void handleValidate()} disabled={isValidating}>
+              {isValidating ? 'Validation…' : 'Confirmer la validation'}
+            </Button>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
     </>

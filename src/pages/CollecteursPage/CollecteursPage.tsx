@@ -183,7 +183,7 @@ export function CollecteursPage() {
     return () => {
       cancelled = true
     }
-  }, [f.agency, f.direction, f.selectedDirectionLabel, f.agences])
+  }, [f.agency])
 
   const displayedRows = useMemo(() => {
     const q = filterText.trim().toLowerCase()
