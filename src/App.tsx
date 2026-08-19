@@ -49,7 +49,8 @@ import { RequireAuth } from './components/RequireAuth'
 export default function App() {
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground sm:hidden">
+      {/* Touch-only gate: browser zoom must not hide the app (CSS width shrinks under zoom). */}
+      <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground [@media(pointer:fine)]:hidden">
         <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 text-center text-card-foreground">
           <div className="text-lg font-semibold">Affichage bureau requis</div>
           <div className="mt-2 text-sm text-muted-foreground">
@@ -59,7 +60,7 @@ export default function App() {
         </div>
       </div>
 
-      <div className="hidden sm:block">
+      <div className="hidden [@media(pointer:fine)]:block">
         <Routes>
           <Route index element={<LoginPage />} />
           <Route path="/login" element={<LoginPage />} />

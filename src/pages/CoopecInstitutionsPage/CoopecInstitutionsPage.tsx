@@ -31,6 +31,17 @@ function pickString(row: Record<string, unknown>, keys: string[]): string {
   return ''
 }
 
+function norm(v: string): string {
+  return String(v ?? '').trim().toLowerCase()
+}
+
+function RequiredLabel({ htmlFor, children }: { htmlFor: string; children: string }) {
+  return (
+    <Label htmlFor={htmlFor}>
+      {children} <span className="text-destructive">*</span>
+    </Label>
+  )
+}
 
 function institutionApiCode(row: Record<string, unknown>): string {
   return pickString(row, [
@@ -90,6 +101,7 @@ export function CoopecInstitutionsPage() {
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [editorMode, setEditorMode] = useState<'edit' | 'create'>('edit')
   const [originalApiCode, setOriginalApiCode] = useState('')
+  const [originalLibelle, setOriginalLibelle] = useState('')
   const [form, setForm] = useState<InstitutionDto>(() => ({}))
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -108,6 +120,15 @@ export function CoopecInstitutionsPage() {
       return code.includes(q) || nom.includes(q)
     })
   }, [query, rows])
+
+  const existingCodes = useMemo(
+    () => rows.map((r) => institutionApiCode(asRecord(r))).filter(Boolean),
+    [rows],
+  )
+  const existingNames = useMemo(
+    () => rows.map((r) => institutionDisplayName(asRecord(r))).filter(Boolean),
+    [rows],
+  )
   const tablePg = useTablePagination(filtered)
 
   async function refresh() {
@@ -136,6 +157,7 @@ export function CoopecInstitutionsPage() {
     }
     setEditorMode('edit')
     setOriginalApiCode(code)
+    setOriginalLibelle(institutionDisplayName(row))
     setForm(rowToDto(row))
     setSaveError(null)
     setIsEditorOpen(true)
@@ -144,31 +166,91 @@ export function CoopecInstitutionsPage() {
   function openCreate() {
     setEditorMode('create')
     setOriginalApiCode('')
-    setForm({ identifiant: '', libelle: '', montantMise: '' })
+    setOriginalLibelle('')
+    setForm({
+      identifiant: '',
+      libelle: '',
+      sigle: '',
+      telephone: '',
+      email: '',
+      adresse: '',
+      montantMise: '',
+    })
     setSaveError(null)
     setIsEditorOpen(true)
+  }
+
+  function validateForm(): string | null {
+    const identifiant = String(form.identifiant ?? '').trim()
+    const libelle = String(form.libelle ?? '').trim()
+    const sigle = String(form.sigle ?? '').trim()
+    const telephone = String(form.telephone ?? '').trim()
+    const email = String(form.email ?? '').trim()
+    const adresse = String(form.adresse ?? '').trim()
+    const montantRaw = String(form.montantMise ?? '').trim().replace(',', '.')
+
+    if (!identifiant) return 'Le code est obligatoire.'
+    if (!/^\d+$/.test(identifiant)) {
+      return 'Le code doit être strictement numérique (pas de lettres ni caractères spéciaux).'
+    }
+    if (identifiant.length > 6) return 'Le code ne doit pas dépasser 6 caractères.'
+
+    const codeTaken = existingCodes.some((c) => norm(c) === norm(identifiant))
+    if (editorMode === 'create' && codeTaken) return 'Ce code est déjà attribué.'
+
+    if (!libelle) return 'Le nom de la Coopec est obligatoire.'
+    const nameTaken = existingNames.some((n) => norm(n) === norm(libelle))
+    if (nameTaken && (editorMode === 'create' || norm(libelle) !== norm(originalLibelle))) {
+      return 'Ce nom de Coopec est déjà attribué.'
+    }
+
+    if (!sigle) return 'Le sigle est obligatoire.'
+    if (!telephone) return 'Le téléphone est obligatoire.'
+    if (!email) return "L'email est obligatoire."
+    if (!adresse) return "L'adresse est obligatoire."
+
+    if (!montantRaw) return 'Le montant minimum est obligatoire.'
+    const montant = Number(montantRaw)
+    if (!Number.isFinite(montant)) return 'Le montant minimum doit être numérique.'
+    if (montant <= 0) return 'Le montant minimum doit être supérieur à 0.'
+    // Multiple de 5, compatible décimal (ex: 15, 20, 25.0).
+    if (Math.abs(montant / 5 - Math.round(montant / 5)) > 1e-9) {
+      return 'Le montant minimum doit être un multiple de 5.'
+    }
+    const intDigits = String(Math.trunc(Math.abs(montant))).length
+    if (intDigits < 3 || intDigits > 6) {
+      return 'Le montant minimum doit contenir entre 3 et 6 chiffres.'
+    }
+    return null
   }
 
   async function onSave() {
     const identifiant = String(form.identifiant ?? '').trim()
     const libelle = String(form.libelle ?? '').trim()
-    if (!identifiant) {
-      setSaveError('Le code est obligatoire.')
-      return
-    }
-    if (!libelle) {
-      setSaveError('Le nom de la Coopec est obligatoire.')
+    const validationError = validateForm()
+    if (validationError) {
+      setSaveError(validationError)
       return
     }
 
     setIsSaving(true)
     setSaveError(null)
     try {
+      const payload: InstitutionDto = {
+        ...form,
+        identifiant,
+        libelle,
+        sigle: String(form.sigle ?? '').trim(),
+        telephone: String(form.telephone ?? '').trim(),
+        email: String(form.email ?? '').trim(),
+        adresse: String(form.adresse ?? '').trim(),
+        montantMise: String(form.montantMise ?? '').trim(),
+      }
       if (editorMode === 'create') {
-        await createInstitution({ ...form, identifiant, libelle })
+        await createInstitution(payload)
       } else {
         const patchCode = originalApiCode || identifiant
-        await updateInstitution(patchCode, { ...form, identifiant, libelle })
+        await updateInstitution(patchCode, payload)
       }
       setIsEditorOpen(false)
       await refresh()
@@ -188,7 +270,12 @@ export function CoopecInstitutionsPage() {
       setDeleteTarget(null)
       await refresh()
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Suppression impossible')
+      const msg = err instanceof Error ? err.message : 'Suppression impossible'
+      setDeleteError(
+        /collecte|operation|donn[ée]e/i.test(msg)
+          ? "Suppression refusée : cette COOPEC possède déjà des données de collecte."
+          : msg,
+      )
     } finally {
       setIsDeleting(false)
     }
@@ -314,20 +401,20 @@ export function CoopecInstitutionsPage() {
           <div className="flex flex-1 flex-col gap-4 px-4 pb-4 pt-2">
             {saveError ? <div className="text-sm text-destructive">{saveError}</div> : null}
             <div className="grid gap-2">
-              <Label htmlFor="inst-code">Code</Label>
+              <RequiredLabel htmlFor="inst-code">Code</RequiredLabel>
               <Input
                 id="inst-code"
                 value={form.identifiant ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, identifiant: e.target.value }))}
                 disabled={editorMode === 'edit'}
-                placeholder="Identifiant unique"
+                placeholder="Code numérique (max 6)"
               />
               {editorMode === 'edit' ? (
                 <p className="text-[11px] text-muted-foreground">Le code ne peut pas être modifié ici.</p>
               ) : null}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="inst-libelle">Coopec</Label>
+              <RequiredLabel htmlFor="inst-libelle">Coopec</RequiredLabel>
               <Input
                 id="inst-libelle"
                 value={form.libelle ?? ''}
@@ -336,52 +423,51 @@ export function CoopecInstitutionsPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="inst-montant-mise">Montant Mise</Label>
+              <RequiredLabel htmlFor="inst-montant-mise">Montant minimum</RequiredLabel>
               <Input
                 id="inst-montant-mise"
-                type="number"
+                type="text"
                 value={form.montantMise ?? ''}
                 onChange={(e) => setForm((f) => ({ ...f, montantMise: e.target.value }))}
-                placeholder="0"
+                placeholder="Ex: 1000"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Numérique, décimal accepté, &gt; 0, multiple de 5, 3 à 6 chiffres.
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <RequiredLabel htmlFor="inst-sigle">Sigle</RequiredLabel>
+              <Input
+                id="inst-sigle"
+                value={form.sigle ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, sigle: e.target.value }))}
               />
             </div>
-            {editorMode === 'edit' ? (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="inst-sigle">Sigle (optionnel)</Label>
-                  <Input
-                    id="inst-sigle"
-                    value={form.sigle ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, sigle: e.target.value || undefined }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="inst-tel">Téléphone (optionnel)</Label>
-                  <Input
-                    id="inst-tel"
-                    value={form.telephone ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, telephone: e.target.value || undefined }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="inst-email">Email (optionnel)</Label>
-                  <Input
-                    id="inst-email"
-                    type="email"
-                    value={form.email ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value || undefined }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="inst-adresse">Adresse (optionnel)</Label>
-                  <Input
-                    id="inst-adresse"
-                    value={form.adresse ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, adresse: e.target.value || undefined }))}
-                  />
-                </div>
-              </>
-            ) : null}
+            <div className="grid gap-2">
+              <RequiredLabel htmlFor="inst-tel">Téléphone</RequiredLabel>
+              <Input
+                id="inst-tel"
+                value={form.telephone ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, telephone: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <RequiredLabel htmlFor="inst-email">Email</RequiredLabel>
+              <Input
+                id="inst-email"
+                type="email"
+                value={form.email ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <RequiredLabel htmlFor="inst-adresse">Adresse</RequiredLabel>
+              <Input
+                id="inst-adresse"
+                value={form.adresse ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, adresse: e.target.value }))}
+              />
+            </div>
           </div>
           <SheetFooter className="border-t border-border px-4 py-3">
             <Button type="button" variant="outline" onClick={() => setIsEditorOpen(false)}>

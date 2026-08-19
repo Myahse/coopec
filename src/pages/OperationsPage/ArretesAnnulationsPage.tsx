@@ -643,7 +643,7 @@ export function ArretesAnnulationsPage() {
           </div>
         </aside>
 
-        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
           <div className="flex min-h-0 flex-[3] flex-col border-b border-border">
             <div className={TABLE_SCROLL_AREA_CLASS}>
               <table className="min-w-[1100px] w-full border-collapse text-xs">

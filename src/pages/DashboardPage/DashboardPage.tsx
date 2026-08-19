@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import heroSlide1 from '../../assets/ChatGPT Image Apr 22, 2026, 09_10_19 AM.png'
-import heroSlide2 from '../../assets/Gemini_Generated_Image_ch8q8tch8q8tch8q.png'
-import heroSlide3 from '../../assets/ChatGPT Image Apr 21, 2026, 07_03_26 PM.png'
+import { useNavigate } from 'react-router-dom'
 import { DashboardAdminInfoCard } from '@/components/DashboardAdminInfoCard'
 import { enrichDashboardSidebarUser, getDashboardSidebarUser } from '@/utils/dashboard-sidebar-user'
 import { getConnectedUserCodeAgence } from '@/utils/connected-user-login'
 import { getStoredAuth } from '@/utils/auth-session'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { LucideIcon } from 'lucide-react'
@@ -47,6 +46,15 @@ function emptySnapshot(): DashboardTileSnapshot {
   }
 }
 
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function defaultDateDebut(): string {
+  const y = new Date().getFullYear()
+  return `${y}-01-01`
+}
+
 type DashboardCardItem =
   | { kind: 'simple'; id: string; label: string; value: string; Icon: LucideIcon }
   | {
@@ -73,7 +81,7 @@ function buildDashboardCards(
   const isCollecteurScoped = Boolean(opts?.collecteurSelected)
 
   return [
-    { kind: 'simple', id: 'en-ligne', label: 'Collecteurs en ligne', value: fmt(s.collecteursEnLigne), Icon: Users },
+    { kind: 'simple', id: 'en-ligne', label: 'Collectrices en ligne', value: fmt(s.collecteursEnLigne), Icon: Users },
     { kind: 'simple', id: 'montants', label: 'Montants collectés', value: fmt(s.montantsCollectes), Icon: BadgeCheck },
     { kind: 'simple', id: 'operations', label: "Nombre d'opérations effectuées", value: fmt(s.nombreOperations), Icon: Receipt },
     { kind: 'simple', id: 'charges', label: "Charges d'épargne", value: fmt(s.chargesEpargne), Icon: HandCoins },
@@ -116,11 +124,11 @@ function renderCollecteursAyantTotalBlock(
 ): ReactNode {
   const isDash = size === 'dashboard'
   const valueClass = isDash
-    ? 'text-lg font-semibold tabular-nums text-foreground sm:text-xl'
-    : 'text-base font-semibold tabular-nums text-foreground sm:text-lg'
+    ? 'text-xl font-semibold tabular-nums text-foreground sm:text-2xl'
+    : 'text-lg font-semibold tabular-nums text-foreground sm:text-xl'
   const labelClass = isDash
-    ? 'text-[10px] font-medium uppercase tracking-wide text-muted-foreground'
-    : 'text-[10px] font-medium text-muted-foreground'
+    ? 'text-xs font-medium uppercase tracking-wide text-muted-foreground'
+    : 'text-xs font-medium text-muted-foreground'
 
   return (
     <div
@@ -156,34 +164,49 @@ function ClientsCountBannerCard({
   loading,
   error,
   Icon,
+  onClick,
 }: {
   label: string
   count: number | null
   loading: boolean
   error?: string
   Icon: LucideIcon
+  onClick?: () => void
 }) {
+  const isClickable = Boolean(onClick)
   return (
     <div
-      className="shrink-0 rounded-2xl bg-card/90 px-3.5 py-2.5 text-card-foreground shadow-sm ring-1 ring-border backdrop-blur-md"
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (!onClick) return
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        onClick()
+      }}
+      className={[
+        'shrink-0 rounded-2xl bg-card/90 px-3.5 py-2.5 text-card-foreground shadow-sm ring-1 ring-border backdrop-blur-md',
+        isClickable ? 'cursor-pointer hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40' : '',
+      ].join(' ')}
       title={error}
     >
       <div className="flex items-center gap-2.5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
-          <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+          <Icon className="h-5 w-5 text-muted-foreground" aria-hidden />
         </div>
         <div className="min-w-0">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
           <div
             className={[
-              'text-2xl font-semibold tabular-nums leading-tight text-foreground',
+              'text-3xl font-semibold tabular-nums leading-tight text-foreground',
             ].join(' ')}
           >
             {loading ? <InlineSpinner /> : formatTileCount(count)}
           </div>
         </div>
       </div>
-      {error ? <p className="mt-1 max-w-[10rem] truncate text-[10px] text-destructive">{error}</p> : null}
+      {error ? <p className="mt-1 max-w-[10rem] truncate text-xs text-destructive">{error}</p> : null}
     </div>
   )
 }
@@ -205,7 +228,9 @@ export function DashboardPage() {
     )
   }, [f.agences, f.agencesAllRows, f.directionChoicesAll])
 
-  const [heroSlideIndex, setHeroSlideIndex] = useState(0)
+  const navigate = useNavigate()
+  const [dateDebut, setDateDebut] = useState(defaultDateDebut())
+  const [dateFin, setDateFin] = useState(todayIso())
   const [tileSnapshot, setTileSnapshot] = useState<DashboardTileSnapshot>(() => emptySnapshot())
   const [tilesLoading, setTilesLoading] = useState(false)
   const [tileErrors, setTileErrors] = useState<DashboardTileErrors>({})
@@ -220,15 +245,6 @@ export function DashboardPage() {
     return collecteurLabelForCode(collecteurSelected, collecteursOptions)
   }, [collecteurSelected, collecteursOptions])
 
-  const heroSlides = useMemo(() => [heroSlide1, heroSlide2, heroSlide3], [])
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setHeroSlideIndex((i) => (i + 1) % heroSlides.length)
-    }, 6000)
-    return () => window.clearInterval(id)
-  }, [heroSlides.length])
-
   useEffect(() => {
     let cancelled = false
     setTilesLoading(true)
@@ -238,6 +254,8 @@ export function DashboardPage() {
         direction: f.direction,
         agence: f.agency,
         institution: f.institution,
+        dateDebut,
+        dateFin,
       })
       if (!cancelled) {
         setTileSnapshot(snapshot)
@@ -248,7 +266,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [f.direction, f.agency, f.institution])
+  }, [f.direction, f.agency, f.institution, dateDebut, dateFin])
 
   useEffect(() => {
     // Filters changed: keep UI consistent, but do not auto-load.
@@ -308,6 +326,8 @@ export function DashboardPage() {
         agence: f.agency,
         institution: f.institution,
         collecteur: collecteurSelected !== 'Tous' ? collecteurSelected : undefined,
+        dateDebut,
+        dateFin,
       })
       setTileSnapshot(snapshot)
       setTileErrors(errors)
@@ -328,20 +348,10 @@ export function DashboardPage() {
     <>
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
       {/* Hero section (top part of the screen) */}
-      <header className="relative h-[58vh] min-h-[320px] w-full shrink-0 overflow-hidden bg-muted sm:h-[54vh] md:h-[50vh] lg:h-[46vh]">
-        <div
-          className="absolute inset-0 flex h-full w-full transition-transform duration-700 ease-in-out"
-          style={{ transform: `translateX(-${heroSlideIndex * 100}%)` }}
-        >
-          {heroSlides.map((src) => (
-            <div key={src} className="h-full w-full shrink-0">
-              <img src={src} alt="Hero" className="h-full w-full object-cover object-left-top" />
-            </div>
-          ))}
-        </div>
+      <header className="relative h-[52vh] min-h-[280px] w-full shrink-0 overflow-hidden bg-muted sm:h-[49vh] md:h-[45vh] lg:h-[41vh]">
         <div className="absolute inset-0 bg-background/35" />
         <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/35 to-transparent" />
-        <div className="relative z-10 flex h-full flex-wrap items-end justify-between gap-3 px-4 pb-5 sm:px-6 lg:px-8">
+        <div className="relative z-10 flex h-full flex-wrap items-end justify-between gap-3 px-4 pb-4 sm:px-6 lg:px-8">
           <DashboardAdminInfoCard user={adminUser} className="sm:min-w-[18rem] sm:max-w-md" />
           <ClientsCountBannerCard
             label="Clients inactifs"
@@ -351,10 +361,15 @@ export function DashboardPage() {
               !tilesLoading && tileSnapshot.clientsInactifs == null ? tileErrors.dashboard : undefined
             }
             Icon={UserX}
+            onClick={() =>
+              navigate(
+                `/dashboard/clients?inactive=1&dateStart=${encodeURIComponent(dateDebut)}&dateEnd=${encodeURIComponent(dateFin)}&direction=${encodeURIComponent(f.direction)}&agence=${encodeURIComponent(f.agency)}`,
+              )
+            }
           />
           <div className="min-w-0 max-w-xl rounded-2xl bg-card/90 px-4 py-3 text-card-foreground shadow-sm ring-1 ring-border backdrop-blur-md sm:ml-auto">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Bienvenue</div>
-            <div className="mt-1 truncate text-2xl font-semibold tracking-tight sm:text-3xl">
+            <div className="text-sm font-medium uppercase tracking-wide text-muted-foreground">Bienvenue</div>
+            <div className="mt-1 truncate text-3xl font-semibold tracking-tight">
               Bienvenue sur votre dashboard COOPEC
             </div>
           </div>
@@ -363,52 +378,73 @@ export function DashboardPage() {
       </header>
 
       {/* Content */}
-      <main className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
+      <main className="min-h-0 flex-1 overflow-auto">
         <div className="sticky top-0 z-30 border-b border-border bg-background/85 px-4 py-1.5 backdrop-blur sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <div>
-              <Label className="text-xs text-muted-foreground">Institution</Label>
+              <Label className="text-sm text-muted-foreground">Institution</Label>
               <Button
                 type="button"
                 variant="outline"
-                className="mt-1 w-full justify-between gap-2 h-9"
+                className="mt-1 w-full justify-between gap-2 h-10"
                 disabled={f.isInstitutionsLoading || f.institutionLocked}
                 onClick={() => f.openFiltersDrawer('institution')}
               >
-                <span className="min-w-0 flex-1 truncate text-left">{f.selectedInstitutionLabel || 'Choisir'}</span>
-                <span className="shrink-0 text-muted-foreground">▼</span>
+                <span className="min-w-0 flex-1 truncate text-left text-sm">{f.selectedInstitutionLabel || 'Choisir'}</span>
+                <span className="shrink-0 text-muted-foreground text-sm">▼</span>
               </Button>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Direction</Label>
+              <Label className="text-sm text-muted-foreground">Direction</Label>
               <Button
                 type="button"
                 variant="outline"
-                className="mt-1 w-full justify-between gap-2 h-9"
+                className="mt-1 w-full justify-between gap-2 h-10"
                 disabled={f.isInstitutionsLoading}
                 onClick={() => f.openFiltersDrawer('direction')}
               >
-                <span className="min-w-0 flex-1 truncate text-left">{f.selectedDirectionLabel || 'Choisir'}</span>
-                <span className="shrink-0 text-muted-foreground">▼</span>
+                <span className="min-w-0 flex-1 truncate text-left text-sm">{f.selectedDirectionLabel || 'Choisir'}</span>
+                <span className="shrink-0 text-muted-foreground text-sm">▼</span>
               </Button>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Agence</Label>
+              <Label className="text-sm text-muted-foreground">Agence</Label>
               <Button
                 type="button"
                 variant="outline"
-                className="mt-1 w-full justify-between gap-2 h-9"
+                className="mt-1 w-full justify-between gap-2 h-10"
                 disabled={f.direction !== 'Toutes' && f.isAgencesByDirectionLoading}
                 onClick={() => f.openFiltersDrawer('agency')}
               >
-                <span className="min-w-0 flex-1 truncate text-left">{f.selectedAgencyLabel || 'Choisir'}</span>
-                <span className="shrink-0 text-muted-foreground">▼</span>
+                <span className="min-w-0 flex-1 truncate text-left text-sm">{f.selectedAgencyLabel || 'Choisir'}</span>
+                <span className="shrink-0 text-muted-foreground text-sm">▼</span>
               </Button>
+            </div>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-end gap-3">
+            <div>
+              <Label className="text-sm text-muted-foreground">Date début</Label>
+              <Input
+                type="date"
+                className="mt-1 h-10 w-[140px] text-sm"
+                value={dateDebut}
+                onChange={(e) => setDateDebut(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-sm text-muted-foreground">Date fin</Label>
+              <Input
+                type="date"
+                className="mt-1 h-10 w-[140px] text-sm"
+                value={dateFin}
+                onChange={(e) => setDateFin(e.target.value)}
+              />
             </div>
           </div>
         </div>
 
-        <section className="px-4 pt-1.5 sm:px-6 lg:px-8">
+        <section className="px-4 pt-1 sm:px-6 lg:px-8">
           <div className="mb-3 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
             <Button
               type="button"
@@ -470,17 +506,38 @@ export function DashboardPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {dashboardCards.map((card) => {
               const Icon = card.Icon
+              const isEnLigne = card.id === 'en-ligne'
               return (
-              <Card key={card.id} className="h-full rounded-2xl">
+              <Card
+                key={card.id}
+                className={[
+                  'h-full rounded-2xl',
+                  isEnLigne ? 'cursor-pointer hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40' : '',
+                ].join(' ')}
+                role={isEnLigne ? 'button' : undefined}
+                tabIndex={isEnLigne ? 0 : undefined}
+                onClick={
+                  isEnLigne ? () => navigate('/dashboard/etats/paiement-en-ligne') : undefined
+                }
+                onKeyDown={
+                  isEnLigne
+                    ? (e) => {
+                        if (e.key !== 'Enter' && e.key !== ' ') return
+                        e.preventDefault()
+                        navigate('/dashboard/etats/paiement-en-ligne')
+                      }
+                    : undefined
+                }
+              >
                 <CardContent className="flex h-full min-h-[128px] flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold leading-snug [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
+                      <div className="text-base font-semibold leading-snug [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
                         {card.label}
                       </div>
                     </div>
-                    <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-muted text-foreground ring-1 ring-border">
-                      <Icon className="size-6" aria-hidden="true" />
+                    <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-muted text-foreground ring-1 ring-border">
+                      <Icon className="size-7" aria-hidden="true" />
                     </div>
                   </div>
 
@@ -489,7 +546,7 @@ export function DashboardPage() {
                       className={[
                         'mt-auto rounded-xl border border-border bg-background px-3 py-2 text-center',
                         'font-semibold tracking-tight text-foreground',
-                        'text-2xl sm:text-2xl',
+                        'text-3xl sm:text-3xl',
                         'truncate',
                       ].join(' ')}
                       title={tilesLoading ? undefined : card.value}

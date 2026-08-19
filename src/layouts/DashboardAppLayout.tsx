@@ -10,7 +10,7 @@ function DashboardChrome() {
   const { openSection } = useDashboardSectionNav()
 
   return (
-    <div className="flex h-screen min-h-0 w-full overflow-hidden bg-background text-foreground">
+    <div className="flex h-dvh max-h-dvh min-h-0 w-full overflow-hidden bg-background text-foreground">
       <DashboardSidebar
         onSelectItem={openSection}
         onLogout={async () => {
@@ -18,7 +18,8 @@ function DashboardChrome() {
           navigate('/')
         }}
       />
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {/* overflow-auto: fallback scroll when zoom shrinks the viewport */}
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
         <Outlet />
       </main>
     </div>

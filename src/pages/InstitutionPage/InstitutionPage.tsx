@@ -277,7 +277,7 @@ export function InstitutionPage() {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden px-3 pb-2 lg:px-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-3 pb-2 lg:px-4">
         {alertMsg ? (
           <Alert
             variant={success && !loadError && !saveError ? 'default' : 'destructive'}
@@ -290,9 +290,9 @@ export function InstitutionPage() {
           </Alert>
         ) : null}
 
-        <div className="grid h-full min-h-0 flex-1 grid-cols-1 gap-4 overflow-hidden rounded-lg border border-border bg-card p-3 text-card-foreground lg:grid-cols-12">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto rounded-lg border border-border bg-card p-3 text-card-foreground lg:grid-cols-12 lg:overflow-hidden">
           {/* Gauche */}
-          <section className="flex h-full min-h-0 flex-col gap-1.5 overflow-hidden lg:col-span-3">
+          <section className="flex min-h-0 flex-col gap-1.5 overflow-y-auto lg:col-span-3 lg:h-full">
             <SectionTitle>Informations générales</SectionTitle>
             <div className="flex min-h-0 flex-1 flex-col gap-1">
               <FormRow stretch id="identifiant" label="Identifiant">
@@ -394,8 +394,8 @@ export function InstitutionPage() {
           </section>
 
           {/* Centre */}
-          <section className="flex h-full min-h-0 flex-col gap-2 overflow-hidden lg:col-span-5">
-            <div className="flex min-h-0 flex-[0.9] flex-col gap-1">
+          <section className="flex min-h-0 flex-col gap-2 overflow-y-auto lg:col-span-5 lg:h-full">
+            <div className="flex min-h-0 flex-[0.9] flex-col gap-1 overflow-y-auto">
               <SectionTitle>Paramètres de messagerie</SectionTitle>
               <FormRow stretch id="adresseMessagerie" label="Adresse messagerie">
                 <Input
@@ -479,7 +479,7 @@ export function InstitutionPage() {
               </FormRow>
             </div>
 
-            <div className="flex min-h-0 flex-[1.4] flex-col gap-1 overflow-hidden">
+            <div className="flex min-h-0 flex-[1.4] flex-col gap-1 overflow-y-auto">
               <SectionTitle>Autres paramétrages</SectionTitle>
               <FormRow stretch id="objetMailChangementPassword" label="Objet mail de changement password">
                 <Input
@@ -597,7 +597,7 @@ export function InstitutionPage() {
           </section>
 
           {/* Droite */}
-          <section className="flex h-full min-h-0 flex-col gap-1.5 overflow-hidden lg:col-span-4">
+          <section className="flex min-h-0 flex-col gap-1.5 overflow-y-auto lg:col-span-4 lg:h-full">
             <input
               ref={logoInputRef}
               type="file"

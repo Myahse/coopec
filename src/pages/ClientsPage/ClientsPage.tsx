@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { TablePaginationBar } from '@/components/TablePagination'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -103,9 +104,18 @@ function mapApiToUiRow(
 
 export function ClientsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  const wantsInactive = params.get('inactive') === '1'
+
+  const initialFilterDirection = params.get('direction') ?? 'Toutes'
+  const initialFilterAgence = params.get('agence') ?? 'Toutes'
+  const initialDateStart = params.get('dateStart') ?? ''
+  const initialDateEnd = params.get('dateEnd') ?? ''
+
   const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [filterAgence, setFilterAgence] = useState<string>('Toutes')
-  const [filterDirection, setFilterDirection] = useState<string>('Toutes')
+  const [filterAgence, setFilterAgence] = useState<string>(initialFilterAgence)
+  const [filterDirection, setFilterDirection] = useState<string>(initialFilterDirection)
   const [directionChoices, setDirectionChoices] = useState<{ value: string; label: string }[]>([])
   const [directionApiError, setDirectionApiError] = useState<string | null>(null)
   const [agencesAllRows, setAgencesAllRows] = useState<unknown[]>([])
@@ -114,8 +124,8 @@ export function ClientsPage() {
   const [agencesByDirectionError, setAgencesByDirectionError] = useState<string | null>(null)
   const [agencyApiError, setAgencyApiError] = useState<string | null>(null)
 
-  const [dateStart, setDateStart] = useState('')
-  const [dateEnd, setDateEnd] = useState('')
+  const [dateStart, setDateStart] = useState(initialDateStart)
+  const [dateEnd, setDateEnd] = useState(initialDateEnd)
   const [apiSearch, setApiSearch] = useState('')
   const [apiCollecteur, setApiCollecteur] = useState('')
   const [telephone, setTelephone] = useState('')
@@ -125,6 +135,7 @@ export function ClientsPage() {
   const [rows, setRows] = useState<UiClientRow[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showInactive] = useState<boolean>(wantsInactive)
   const [lastSearch, setLastSearch] = useState<{
     body: SearchClientDto
     query: { search?: string; collecteur?: string }
@@ -283,6 +294,27 @@ export function ClientsPage() {
     }
   }
 
+  const autoLoadedInactiveRef = useRef(false)
+  useEffect(() => {
+    if (!wantsInactive) return
+    if (autoLoadedInactiveRef.current) return
+    if (filterAgence === 'Toutes') return
+    if (!dateStart.trim() || !dateEnd.trim()) return
+
+    autoLoadedInactiveRef.current = true
+    void runSearch(
+      {
+        codeAgence: filterAgence.trim(),
+        dateDebut: dateStart.trim(),
+        dateFin: dateEnd.trim(),
+      },
+      {
+        search: apiSearch.trim() || undefined,
+        collecteur: apiCollecteur.trim() || undefined,
+      },
+    )
+  }, [apiCollecteur, apiSearch, dateEnd, dateStart, filterAgence, wantsInactive])
+
   async function refetchIfPossible() {
     if (!lastSearch) return
     await runSearch(lastSearch.body, lastSearch.query)
@@ -320,8 +352,12 @@ export function ClientsPage() {
     if (tel) out = out.filter((r) => String(r.telephone ?? '').toLowerCase().includes(tel))
     if (cClient) out = out.filter((r) => String(r.compteLes ?? '').toLowerCase().includes(cClient))
     if (cLce) out = out.filter((r) => String(r.compteLce ?? '').toLowerCase().includes(cLce))
+    if (showInactive) {
+      // Convention UI: `etat === 1` = actif, tout le reste = inactif.
+      out = out.filter((r) => (r.etat ?? 0) !== 1)
+    }
     return out
-  }, [compteClient, compteLce, rows, telephone])
+  }, [compteClient, compteLce, rows, showInactive, telephone])
   const tablePg = useTablePagination(filtered)
 
   function openEdit(row: UiClientRow) {
@@ -497,6 +533,9 @@ export function ClientsPage() {
                 <div className="text-xs text-muted-foreground">
                   Agence sélectionnée :{' '}
                   <span className="font-medium text-foreground">{filterAgence === 'Toutes' ? '—' : agencySelectLabel}</span>
+                  {showInactive ? (
+                    <div className="mt-1 text-sm font-semibold text-destructive">Affichage : clients inactifs</div>
+                  ) : null}
                 </div>
               </div>
 

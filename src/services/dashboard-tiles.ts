@@ -5,6 +5,9 @@ export type DashboardFiltersSnapshot = {
   agence: string
   institution: string
   collecteur?: string
+  /** Optionnel: période pour les stats dashboard (permet d'afficher des dates antérieures). */
+  dateDebut?: string
+  dateFin?: string
 }
 
 export type DashboardTileSnapshot = {
@@ -53,6 +56,8 @@ export async function loadDashboardTileSnapshot(
     const snapshot = await getDashboardStats({
       ...base,
       collecteur: f.collecteur,
+      dateDebut: f.dateDebut,
+      dateFin: f.dateFin,
     })
     return { snapshot, errors }
   } catch (err) {

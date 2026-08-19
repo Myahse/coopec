@@ -11,6 +11,9 @@ export type DashboardStatsQuery = {
   direction?: string
   agence?: string
   institution?: string
+  /** Optionnel: période (permet d'afficher des dates antérieures). */
+  dateDebut?: string
+  dateFin?: string
   /** Filtrer par collecteur (login/code) quand le backend le supporte. */
   collecteur?: string
 }
@@ -115,9 +118,13 @@ function buildStatsRequestQuery(
   const directionRaw = String(query.direction ?? '').trim()
   const agenceRaw = String(query.agence ?? '').trim()
   const institutionRaw = String(query.institution ?? '').trim()
+  const dateDebutRaw = String(query.dateDebut ?? '').trim()
+  const dateFinRaw = String(query.dateFin ?? '').trim()
   const direction = directionRaw && directionRaw !== 'Toutes' ? directionRaw : ''
   const agence = agenceRaw && agenceRaw !== 'Toutes' ? agenceRaw : ''
   const institution = institutionRaw && institutionRaw !== 'Toutes' ? institutionRaw : ''
+  const dateDebut = dateDebutRaw ? dateDebutRaw : ''
+  const dateFin = dateFinRaw ? dateFinRaw : ''
   const codeAgence = resolveStatsCodeAgence(query)
   const collecteur = String(query.collecteur ?? '').trim()
 
@@ -133,6 +140,8 @@ function buildStatsRequestQuery(
       // Backends are inconsistent: send multiple likely keys.
       collecteur: collecteur || undefined,
       login: collecteur || undefined,
+      dateDebut: dateDebut || undefined,
+      dateFin: dateFin || undefined,
     }
   }
 
@@ -147,6 +156,8 @@ function buildStatsRequestQuery(
     codeInstitution: institution || undefined,
     collecteur: collecteur || undefined,
     login: collecteur || undefined,
+    dateDebut: dateDebut || undefined,
+    dateFin: dateFin || undefined,
   }
 }
 

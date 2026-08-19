@@ -15,7 +15,7 @@ export function DrawerListPicker({ items, selectedValue, onSelect, emptyLabel }:
       <div className="text-xs text-muted-foreground">
         {items.length} élément{items.length > 1 ? 's' : ''}
       </div>
-      <div className="max-h-[320px] overflow-auto rounded-lg border border-border">
+      <div className="max-h-[240px] overflow-auto rounded-lg border border-border">
         {items.map((it) => {
           const isActive = it.value === selectedValue
           return (

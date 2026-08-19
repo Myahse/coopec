@@ -1,6 +1,6 @@
 import { resolveAccountProfileLabel } from '@/utils/profile-label'
 import { getStoredAuth, getStoredUserContext } from '@/utils/auth-session'
-import { agencyLabelForCode } from '@/utils/organization-filters'
+import { agencyLabelForCode, directionLabelForCode } from '@/utils/organization-filters'
 import { resolveAccountDirectionFromApi } from '@/utils/direction-label'
 
 export type DashboardSidebarUser = {
@@ -49,7 +49,9 @@ export function enrichDashboardSidebarUser(
   if (!user) return undefined
   const agCode = String(agenceCodeOverride ?? user.agency ?? '').trim()
   const agency = agencyLabelForCode(agCode, lookup.agenceOptions, lookup.agencesRows)
-  return { ...user, agency }
+  // Convert direction code (often numeric) to its human label when we can.
+  const direction = directionLabelForCode(user.direction, lookup.directionChoices)
+  return { ...user, agency, direction }
 }
 
 

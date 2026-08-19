@@ -21,7 +21,7 @@ const DASHBOARD_HOME_PATH = '/dashboard'
 
 function sectionRowClass(isActive: boolean): string {
   return [
-    'block w-full rounded-none border-0 border-b px-3 py-2.5 text-left text-sm text-sidebar-foreground transition-colors',
+    'block w-full rounded-none border-0 border-b px-3 py-2.5 text-left text-[14px] text-sidebar-foreground transition-colors',
     isActive
       ? 'border-b-sidebar-ring bg-white/15 font-semibold shadow-sm'
       : 'border-sidebar-border hover:border-b-sidebar-ring hover:bg-white/10',
@@ -54,13 +54,17 @@ export function DashboardSidebar({ onNavigate, onLogout, className, onSelectItem
           className="inline-flex rounded-lg transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           aria-label="Retour au tableau de bord"
         >
-          <img src={logo} alt="COOPEC" className="h-14 w-auto max-w-[220px] object-contain sm:h-16" />
+          <img
+            src={logo}
+            alt="COOPEC"
+            className="h-20 w-auto max-w-[260px] object-contain sm:h-20"
+          />
         </Link>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <nav className="w-full py-3">
-          <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-sidebar-foreground/80">
+          <div className="px-3 pb-2 text-sm font-semibold uppercase tracking-wide text-sidebar-foreground/80">
             Sections
           </div>
           <ul className="w-full space-y-0">
