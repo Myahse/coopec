@@ -28,9 +28,7 @@ export function AidePageShell({ title, children }: AidePageShellProps) {
       }
     >
       <div className="flex flex-col items-center gap-4">
-        <p className="max-w-5xl shrink-0 text-center text-sm text-muted-foreground">
-          Ces pages s&apos;ouvrent dans un nouvel onglet (le site externe utilise ses propres cookies/session).
-        </p>
+        
         <DashboardSectionCard
           title="Liens"
           className="mx-auto w-full max-w-5xl [&_[data-slot=card-header]]:text-center"

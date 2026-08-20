@@ -96,9 +96,46 @@ function resolveLoginPath(): string {
 function jwtLikeString(value: string): string | undefined {
   const t = value.trim()
   if (t.length < 32) return undefined
+  // Emails like a.b@c.com have 3 "." segments — never treat as JWT.
+  if (t.includes('@')) return undefined
   const parts = t.split('.')
-  if (parts.length !== 3 || parts.some((p) => !p.length)) return undefined
-  return t
+  if (parts.length !== 3) return undefined
+  // Real JWTs use base64url segments.
+  const b64url = /^[A-Za-z0-9_-]+$/
+  if (parts.every((p) => p.length >= 8 && b64url.test(p))) return t
+  return undefined
+}
+
+function collectSetCookieHeaders(res: Response): string[] {
+  const headers = res.headers as Headers & { getSetCookie?: () => string[] }
+  if (typeof headers.getSetCookie === 'function') {
+    try {
+      return headers.getSetCookie()
+    } catch {
+      // fall through
+    }
+  }
+  const single = res.headers.get('set-cookie')
+  return single ? [single] : []
+}
+
+function extractTokenFromSetCookie(res: Response): string | undefined {
+  const cookieNameRe =
+    /^(token|access_token|accessToken|auth_token|authToken|jwt|bearer|session|JSESSIONID|coopec[_-]?token)$/i
+  for (const raw of collectSetCookieHeaders(res)) {
+    const first = String(raw).split(';')[0] ?? ''
+    const eq = first.indexOf('=')
+    if (eq <= 0) continue
+    const name = first.slice(0, eq).trim()
+    const value = first.slice(eq + 1).trim()
+    if (!value) continue
+    if (cookieNameRe.test(name)) {
+      return credentialWithoutBearerScheme(decodeURIComponent(value))
+    }
+    const asJwt = jwtLikeString(decodeURIComponent(value))
+    if (asJwt && asJwt.includes('.')) return asJwt
+  }
+  return undefined
 }
 
 function extractTokenFromResponseHeaders(res: Response): string | undefined {
@@ -106,8 +143,12 @@ function extractTokenFromResponseHeaders(res: Response): string | undefined {
     const v = value?.trim()
     if (!v) return undefined
     const lower = v.toLowerCase()
-    if (lower.startsWith('bearer ')) return v.slice('bearer '.length).trim() || undefined
-    return jwtLikeString(v) ?? v
+    if (lower.startsWith('bearer ')) {
+      const payload = v.slice('bearer '.length).trim()
+      return jwtLikeString(payload) ?? (payload.includes('@') ? undefined : payload || undefined)
+    }
+    if (lower.startsWith('basic ')) return undefined
+    return jwtLikeString(v)
   }
 
   const named = tryAuth(res.headers.get('authorization') ?? res.headers.get('Authorization'))
@@ -122,17 +163,27 @@ function extractTokenFromResponseHeaders(res: Response): string | undefined {
     'token',
   ] as const) {
     const v = res.headers.get(key)?.trim()
-    if (v) return jwtLikeString(v) ?? v
+    if (v) {
+      const asJwt = jwtLikeString(v)
+      if (asJwt) return asJwt
+    }
   }
 
-  return undefined
+  return extractTokenFromSetCookie(res)
 }
 
 function extractTokenFromJsonBody(data: unknown, depth = 0): string | undefined {
-  if (depth > 10 || data == null) return undefined
+  if (depth > 12 || data == null) return undefined
 
   if (typeof data === 'string') {
-    return jwtLikeString(data)
+    const t = data.trim()
+    if (!t) return undefined
+    if (/^Bearer\s+/i.test(t)) return t.replace(/^Bearer\s+/i, '').trim()
+    return jwtLikeString(t)
+  }
+
+  if (typeof data === 'number' && Number.isFinite(data)) {
+    return undefined
   }
 
   if (typeof data !== 'object') return undefined
@@ -147,12 +198,24 @@ function extractTokenFromJsonBody(data: unknown, depth = 0): string | undefined 
 
   const record = data as Record<string, unknown>
   const keyRe =
-    /^(token|accessToken|access_token|jwt|idToken|id_token|bearer|authToken|auth_token|bearerToken|access)$/i
+    /^(token|accessToken|access_token|jwt|jwttoken|jwtToken|idToken|id_token|bearer|authToken|auth_token|bearerToken|access|jeton|sessionToken|session_token|authorization|Authorization|clef|cleSession|idSession|sessionId)$/i
 
   for (const [k, v] of Object.entries(record)) {
     if (typeof v === 'string' && keyRe.test(k)) {
-      const fromKey = jwtLikeString(v) ?? v.trim()
+      const raw = v.trim()
+      if (!raw || raw.includes('@')) continue
+      if (/^Bearer\s+/i.test(raw)) {
+        const payload = raw.replace(/^Bearer\s+/i, '').trim()
+        if (payload && !payload.includes('@')) return payload
+        continue
+      }
+      const fromKey = jwtLikeString(raw)
       if (fromKey) return fromKey
+    }
+    // Any JWT-shaped string anywhere in the payload (regardless of key name).
+    if (typeof v === 'string') {
+      const asJwt = jwtLikeString(v)
+      if (asJwt && asJwt.split('.').length === 3) return asJwt
     }
     const nested = extractTokenFromJsonBody(v, depth + 1)
     if (nested) return nested
@@ -161,9 +224,20 @@ function extractTokenFromJsonBody(data: unknown, depth = 0): string | undefined 
   return undefined
 }
 
+/** Marker when API authenticates via cookie only (no Bearer in body/headers). */
+export const COOKIE_SESSION_TOKEN = '__coopec_cookie_session__'
+
+function credentialWithoutBearerScheme(raw: string): string {
+  const t = raw.trim()
+  const m = /^Bearer\s+(.+)$/i.exec(t)
+  return (m ? m[1] : t).trim()
+}
+
 export async function login(params: LoginParams): Promise<LoginResult> {
   const apiBase = resolveApiBase()
   const url = `${apiBase}${resolveLoginPath()}`
+  const username = String(params.username ?? '').trim()
+  const password = String(params.password ?? '')
 
   const res = await fetch(url, {
     method: 'POST',
@@ -173,7 +247,8 @@ export async function login(params: LoginParams): Promise<LoginResult> {
       'Content-Type': 'application/json',
       'X-Requested-With': 'XMLHttpRequest',
     },
-    body: JSON.stringify(params),
+    // Some backends expect `login`, OpenAPI uses `username` — send both.
+    body: JSON.stringify({ username, password, login: username }),
   })
 
   const contentType = res.headers.get('content-type') ?? ''
@@ -191,19 +266,31 @@ export async function login(params: LoginParams): Promise<LoginResult> {
   }
 
   let auth: AuthResponse | undefined
-  const authPayload =
-    typeof data === 'object' && data
-      ? (() => {
-          const o = data as Record<string, unknown>
-          if (o.user && typeof o.user === 'object') return o
-          const nested = o.data
-          if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-            const inner = nested as Record<string, unknown>
-            if (inner.user && typeof inner.user === 'object') return inner
-          }
-          return null
-        })()
+  const root =
+    typeof data === 'object' && data && !Array.isArray(data) ? (data as Record<string, unknown>) : null
+  const nested =
+    root?.data && typeof root.data === 'object' && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
       : null
+
+  const authPayload =
+    root && root.user != null && typeof root.user === 'object'
+      ? root
+      : nested && nested.user != null && typeof nested.user === 'object'
+        ? nested
+        : null
+
+  const explicitFail =
+    (root && (root.isLogin === false || root.isLogin === 'false' || root.isLogin === 0 || root.isLogin === '0')) ||
+    (root && (root.user === null || root.user === undefined) && !token)
+
+  if (explicitFail && !authPayload) {
+    const msg =
+      (typeof root?.message === 'string' && root.message.trim()) ||
+      (typeof nested?.message === 'string' && String(nested.message).trim()) ||
+      'Identifiants invalides'
+    throw new Error(msg)
+  }
 
   if (authPayload?.user && typeof authPayload.user === 'object') {
     const isLogin = authPayload.isLogin
@@ -217,13 +304,37 @@ export async function login(params: LoginParams): Promise<LoginResult> {
     token = extractTokenFromJsonBody(data)
   }
 
+  // Optional: mark cookie-backed session when proxy rewrote Set-Cookie.
+  const hasSessionCookie =
+    res.headers.get('x-coopec-has-session') === '1' || collectSetCookieHeaders(res).length > 0
+  if (!token?.trim() && auth?.user && hasSessionCookie) {
+    token = COOKIE_SESSION_TOKEN
+  }
+
+  try {
+    const rootKeys =
+      typeof data === 'object' && data && !Array.isArray(data)
+        ? Object.keys(data as object)
+        : []
+    const userKeys =
+      auth?.user && typeof auth.user === 'object' ? Object.keys(auth.user as object) : []
+    console.info('[coopec login]', {
+      hasToken: Boolean(token?.trim()),
+      hasSessionCookie,
+      rootKeys,
+      userKeys,
+    })
+  } catch {
+    // ignore
+  }
+
   function profileLabelFromAuthUser(u: AuthUser): string {
     return resolveAccountProfileLabel(u as Record<string, unknown>)
   }
 
   const userContext: UserContext = auth?.user
     ? {
-        name: String(auth.user.nomUtilisateur ?? auth.user.login ?? params.username ?? 'Utilisateur'),
+        name: String(auth.user.nomUtilisateur ?? auth.user.login ?? username ?? 'Utilisateur'),
         direction: resolveAccountDirectionFromApi(auth.user as Record<string, unknown>),
         agency: String(auth.user.codeAgence ?? '—'),
         profile: profileLabelFromAuthUser(auth.user),
@@ -237,7 +348,7 @@ export async function login(params: LoginParams): Promise<LoginResult> {
       typeof (data as any).userContext === 'object' &&
       (data as any).userContext
         ? {
-            name: String((data as any).userContext.name ?? params.username ?? 'Utilisateur'),
+            name: String((data as any).userContext.name ?? username ?? 'Utilisateur'),
             direction: resolveAccountDirectionFromApi(
               (data as any).userContext as Record<string, unknown> | undefined,
               String((data as any).userContext?.direction ?? ''),
@@ -247,16 +358,16 @@ export async function login(params: LoginParams): Promise<LoginResult> {
               (data as any).userContext as Record<string, unknown> | undefined,
               String((data as any).userContext?.profile ?? ''),
             ),
-            login: String((data as any).userContext.login ?? params.username ?? '—'),
+            login: String((data as any).userContext.login ?? username ?? '—'),
             email: String((data as any).userContext.email ?? '—'),
             telephone: String((data as any).userContext.telephone ?? '—'),
           }
         : {
-            name: params.username || 'Utilisateur',
+            name: username || 'Utilisateur',
             direction: '—',
             agency: '—',
             profile: '—',
-            login: params.username || '—',
+            login: username || '—',
             email: '—',
             telephone: '—',
           })

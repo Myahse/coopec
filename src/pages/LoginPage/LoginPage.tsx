@@ -4,7 +4,12 @@ import collectSideImage from '../../assets/COLLECT2.png'
 import logo from '../../assets/logo-1.png'
 import { SideImagePanel } from '../../components/SideImagePanel'
 import { login, resetPasswordWeb } from '../../services/auth'
-import { isAuthenticated, isRememberSessionEnabled, setAuthSession } from '@/utils/auth-session'
+import {
+  isAuthenticated,
+  isRememberSessionEnabled,
+  setAuthSession,
+  setStoredBasicAuthorization,
+} from '@/utils/auth-session'
 import { defaultCodeOperationRenvoiParametres } from '@/utils/default-code-operation'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -68,6 +73,8 @@ export function LoginPage() {
           },
         } satisfies import('@/services/auth').AuthResponse)
       setAuthSession(auth, result.userContext, result.token)
+      // login-web returns no JWT; Swagger still works via HTTP Basic (browser doesn't re-prompt).
+      setStoredBasicAuthorization(username, password)
       try {
         if (rememberMe) localStorage.setItem('coopec_remember_username', username.trim())
         else localStorage.removeItem('coopec_remember_username')

@@ -3,6 +3,7 @@ import type { AuthResponse, AuthUser, UserContext } from '@/services/auth'
 const AUTH_KEY = 'coopec_auth'
 const USER_KEY = 'coopec_user'
 const TOKEN_KEY = 'coopec_token'
+const BASIC_KEY = 'coopec_basic'
 const REMEMBER_SESSION_KEY = 'coopec_remember_session'
 
 function readStorage(key: string): string | null {
@@ -63,6 +64,40 @@ export function getStoredToken(): string | null {
     return raw?.trim() || null
   } catch {
     return null
+  }
+}
+
+/** Basic auth header value (`Basic …`) — session only (Swagger-style, no prompt). */
+export function getStoredBasicAuthorization(): string | null {
+  try {
+    return sessionStorage.getItem(BASIC_KEY)?.trim() || null
+  } catch {
+    return null
+  }
+}
+
+export function setStoredBasicAuthorization(username: string, password: string): void {
+  try {
+    const user = username.trim()
+    if (!user) {
+      sessionStorage.removeItem(BASIC_KEY)
+      return
+    }
+    const raw = `${user}:${password}`
+    const bytes = new TextEncoder().encode(raw)
+    let bin = ''
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!)
+    sessionStorage.setItem(BASIC_KEY, `Basic ${btoa(bin)}`)
+  } catch {
+    // ignore
+  }
+}
+
+export function clearStoredBasicAuthorization(): void {
+  try {
+    sessionStorage.removeItem(BASIC_KEY)
+  } catch {
+    // ignore
   }
 }
 
@@ -140,6 +175,7 @@ export function getStoredUserContext(): UserContext | null {
 }
 
 export function isAuthenticated(): boolean {
+  // Same as before: profile session is enough to enter the app shell.
   if (getStoredAuth() != null) return true
   if (getStoredToken()) return true
   return getStoredUserContext() != null
@@ -158,6 +194,7 @@ export function setAuthSession(
   setRememberSessionFlag(true)
 
   if (token?.trim()) writeStorage(TOKEN_KEY, token.trim())
+  else removeStorage(TOKEN_KEY)
 }
 
 export function setStoredToken(token: string | null): void {
@@ -181,6 +218,7 @@ export function clearAuthSession(): void {
   } catch {
     // ignore
   }
+  clearStoredBasicAuthorization()
   setRememberSessionFlag(false)
   clearPersistedAuthStorage()
 }
